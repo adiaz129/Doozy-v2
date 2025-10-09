@@ -1,10 +1,9 @@
-import pool from '../db.js';
+import { getUsersFromDB } from '../services/users.js';
 
 export const getUsers = async (req, res) => {
     try {
-        const q = "SELECT * FROM Users";
-        const [rows] = await pool.query(q);
-        res.json(rows);
+        const response = await getUsersFromDB();
+        res.status(200).json(response);
     } catch (error) {
         console.error('Database error:', error);
         res.status(500).json({ error: 'Database error' });
