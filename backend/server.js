@@ -1,16 +1,18 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import userRoutes from './routes/users.js';
-import { checkConnection } from './config/db.js';
-import { createAllTables } from './utils/dbUtils.js';
+import userRoutes from './src/routes/users.js';
+import authRoutes from './src/routes/auth.js';
+import { checkConnection } from './src/config/db.js';
+import { createAllTables } from './src/utils/dbUtils.js';
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-app.use('/users', userRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
 
 app.listen(8800, async () => {
     console.log("Connected to backend!")

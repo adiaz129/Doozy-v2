@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, View, Platform } from 'react-native';
-import { FIREBASE_AUTH } from './firebaseConfig';
-import { onAuthStateChanged } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -23,7 +22,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, Poppins_400Regular, Poppins_700Bold, Poppins_400Regular_Italic } from '@expo-google-fonts/poppins';
 import * as Notifications from 'expo-notifications';
 import colors from './src/theme/colors';
-import CheckedPostReceived from './src/assets/checked-post-received.svg'
 
 const Tab = createBottomTabNavigator();
 const LandingStack = createStackNavigator();
@@ -32,7 +30,7 @@ const TaskListStack = createStackNavigator();
 const ProfileStack = createStackNavigator();
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
 
 
@@ -42,12 +40,18 @@ export default function App() {
   Poppins_400Regular_Italic,
 });
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(FIREBASE_AUTH, (user) => {
-      setLoggedIn(!!user);
-      setLoading(false);
-    });
-    return unsubscribe;
+useEffect(() => {
+    async function loadLoginStatus() {
+      try {
+        const value = await AsyncStorage.getItem("keepLoggedIn");
+        setIsLoggedIn(value === "true");
+      } catch (e) {
+        console.error("Failed to load login status", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadLoginStatus();
   }, []);
 
   useEffect(() => {
@@ -114,7 +118,7 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <NavigationContainer>
-            {loggedIn ? (
+            {isLoggedIn ? (
               <Tab.Navigator 
               initialRouteName='TaskListTab' 
               screenOptions={({ route }) => ({ headerShown: false, 

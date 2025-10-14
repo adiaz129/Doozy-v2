@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Button, TextInput, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import axios from 'axios';
 import { createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { ref, updateMetadata } from "firebase/storage";
@@ -10,10 +11,14 @@ import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
 import fonts from '../theme/fonts';
 import { checkNameField, checkPasswordField, checkUsernameField } from '../utils/checkFieldFunctions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Register = () => {
     const navigation = useNavigation();
-    const [errorCode, setErrorCode] = useState(null);
+    const [errorCodeName, setErrorCodeName] = useState("");
+    const [errorCodeUsername, setErrorCodeUsername] = useState("");
+    const [errorCodeEmail, setErrorCodeEmail] = useState("");
+    const [errorCodePassword, setErrorCodePassword] = useState("");
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -28,61 +33,32 @@ const Register = () => {
 
     const onSignUp = async () => {
         const { name, email, username, password, confirmPassword } = formData;
+        setErrorCodeName('');
+        setErrorCodeUsername('');
+        setErrorCodeEmail('');
+        setErrorCodePassword('');
         try {
-            await checkNameField(name);
-            await checkUsernameField(username);
-            await checkPasswordField(password, confirmPassword);
-            const userCredential = await createUserWithEmailAndPassword(FIREBASE_AUTH, email, password);
-            const user = userCredential.user;
-
-            // Create user document
-            await setDoc(doc(FIRESTORE_DB, "Users", user.uid), {
-                name,
-                email,
-                username,
-                usernameLower: username.toLowerCase(),
-                posts: 0,
-                tasks: 0,
-                friends: 0,
-                bio: "",
-                profilePic: "https://firebasestorage.googleapis.com/v0/b/doozy-3d54c.appspot.com/o/profilePics%2Fdefault.jpg?alt=media&token=c4b20aae-830c-4d47-aa90-2a3ebd6e16fb"
-            });
-
-            // Update storage metadata
-            const forestRef = ref(FIREBASE_STORAGE, 'profilePics/default.jpg');
-            await updateMetadata(forestRef, { cacheControl: 'public,max-age=31536000' });
+            const response = await axios.post('http://localhost:8800/api/auth/register', {name, email, password, username, confirmPassword});
+            if (response.data.success) {
+                await AsyncStorage.setItem("authToken", response.data.token);
+                await AsyncStorage.setItem("keepLoggedIn", JSON.stringify(true));
+                console.log(response.data);
+            }
 
         } catch (error) {
-            switch(error.code) {
-                case "name-required":
-                    setErrorCode(['name', error.message]);
-                    break;
-                case "username-required":
-                    setErrorCode(['username', error.message]);
-                    break;
-                case "username-taken":
-                    setErrorCode(['username', error.message]);
-                    break;
-                case "password-required":
-                    setErrorCode(['password', error.message]);
-                    break;
-                case "password-mismatch":
-                    setErrorCode(['password', error.message]);
-                    break;
-                case "auth/password-does-not-meet-requirements":
-                    setErrorCode(['password', "Password must be at least 6 characters."]);
-                    break;
-                case "auth/invalid-email":
-                    setErrorCode(['email', "Email must be in the format: user@example.com."]);
-                    break;
-                case "auth/missing-email":
-                    setErrorCode(['email', "Email required."]);
-                    break;
-                case "auth/email-already-in-use":
-                    setErrorCode(['email', "Email is already registered. Log in or use a different email."])
-                    break;
-                default:
-                    console.error("Registration failed: ", error);
+            for (let i = 0; i < error.response.data.errors.length; i++) {
+                if (error.response.data.errors[i].path == "name") {
+                    setErrorCodeName(error.response.data.errors[i].msg);
+                }
+                else if (error.response.data.errors[i].path === "username") {
+                    setErrorCodeUsername(error.response.data.errors[i].msg);
+                }
+                else if (error.response.data.errors[i].path === "email") {
+                    setErrorCodeEmail(error.response.data.errors[i].msg);
+                }
+                else {
+                    setErrorCodePassword(error.response.data.errors[i].msg);
+                }
             }
         }
     }
@@ -111,7 +87,7 @@ const Register = () => {
                             <View style={styles.midSpacer} />
                             <View style={styles.formContainer}>
                                 <Text style={styles.label}>Name</Text>
-                                {errorCode && errorCode[0] == "name" && <Text style={styles.errorMessage}>{errorCode[1]}</Text>}
+                                {errorCodeName && <Text style={styles.errorMessage}>{errorCodeName}</Text>}
                                 <TextInput
                                     placeholder="John Doe"
                                     placeholderTextColor={'#C7C7CD'}
@@ -121,7 +97,7 @@ const Register = () => {
                                 />
 
                                 <Text style={styles.label}>Email</Text>
-                                {errorCode && errorCode[0] == "email" && <Text style={styles.errorMessage}>{errorCode[1]}</Text>}
+                                {errorCodeEmail && <Text style={styles.errorMessage}>{errorCodeEmail}</Text>}
                                 <TextInput
                                     placeholder="johndoe@email.com"
                                     placeholderTextColor={'#C7C7CD'}
@@ -133,7 +109,7 @@ const Register = () => {
                                 />
 
                                 <Text style={styles.label}>Username</Text>
-                                {errorCode && errorCode[0] == "username" && <Text style={styles.errorMessage}>{errorCode[1]}</Text>}
+                                {errorCodeUsername && <Text style={styles.errorMessage}>{errorCodeUsername}</Text>}
                                 <TextInput
                                     placeholder="johndoe123"
                                     placeholderTextColor={'#C7C7CD'}
@@ -144,7 +120,7 @@ const Register = () => {
                                 />
 
                                 <Text style={styles.label}>Password</Text>
-                                {errorCode && errorCode[0] == "password" && <Text style={styles.errorMessage}>{errorCode[1]}</Text>}
+                                {errorCodePassword && <Text style={styles.errorMessage}>{errorCodePassword}</Text>}
                                 <TextInput
                                     placeholder="8+ characters, 1 number"
                                     placeholderTextColor={'#C7C7CD'}
