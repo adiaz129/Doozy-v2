@@ -1,27 +1,28 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useContext } from 'react';
 import { View, Button, TextInput, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FIREBASE_AUTH } from '../../firebaseConfig';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
 import fonts from '../theme/fonts';
+import axios from 'axios';
+import { AuthContext } from '../AuthContext';
 
 const Login = ({ navigation }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [errorCode, setErrorCode] = useState(null);
+    const { setAuth } = useContext(AuthContext);
 
-    const onSignIn = () => {
-        signInWithEmailAndPassword(FIREBASE_AUTH, email, password)
-            .catch((error) => {
-                if (error.code === "auth/invalid-email" || error.code === "auth/invalid-credential" || error.code === "auth/missing-password") {
-                    setErrorCode("Invalid email and/or password.");
-                }
-                else {
-                    console.error("Error logging in:", error);
-                }
-            });
+    const onSignIn = async () => {
+        try {
+            const response = await axios.post('http://localhost:8800/api/auth/login', { email, password });
+            if (response.data.success) {
+                console.log(response.data.message);
+                await setAuth(response.data.token);
+            }
+        } catch (error) {
+            setErrorCode(error.response.data.errors[0].msg);
+        }
     };
 
     const dismissKeyboard = () => {

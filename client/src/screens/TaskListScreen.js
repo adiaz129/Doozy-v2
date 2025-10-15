@@ -50,20 +50,20 @@ const TaskListScreen = (props) => {
     const [selectedLists, setSelectedLists] = useState([]);
 
 
-    useEffect(() => {
-        const unsubscribeTasks = fetchTasks();
-        const unsubscribePosts = fetchPosts();
-        const unsubscribeLists = fetchLists();
-        const unsubscribeUserProfile = fetchUserProfile();
+    // useEffect(() => {
+    //     const unsubscribeTasks = fetchTasks();
+    //     const unsubscribePosts = fetchPosts();
+    //     const unsubscribeLists = fetchLists();
+    //     const unsubscribeUserProfile = fetchUserProfile();
 
-        unsubscribeRef.current = [unsubscribeTasks, unsubscribePosts, unsubscribeLists, unsubscribeUserProfile];
-        return () => {
-            unsubscribeRef.current.forEach(unsub => unsub());
-        };
-    }, [listId, refreshing]);
+    //     unsubscribeRef.current = [unsubscribeTasks, unsubscribePosts, unsubscribeLists, unsubscribeUserProfile];
+    //     return () => {
+    //         unsubscribeRef.current.forEach(unsub => unsub());
+    //     };
+    // }, [listId, refreshing]);
 
     useEffect(() => {
-        sortTasks(taskItems);
+        //sortTasks(taskItems);
     }, [order, taskItems]);
 
     function fetchTasks() {

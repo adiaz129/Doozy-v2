@@ -3,14 +3,13 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 export const postRegister = async (user) => {
-    console.log(user);
-
     try {
         const hashedPassword = await bcrypt.hash(user.password, 10);
         const q = "INSERT INTO users (name, email, password, username, username_lower, profile_pic) VALUES (?, ?, ?, ?, ?, ?)";
         const values = [user.name, user.email.toLowerCase(), hashedPassword, user.username, user.username_lower, user.profile_pic];
 
         const [result] = await pool.query(q, values);
+
         const token = jwt.sign(
             {uid: result.insertId},
             process.env.JWT_SECRET,
@@ -38,5 +37,28 @@ export const postRegister = async (user) => {
             return { success: false, errors: [{msg: msg, path: path}] };
         }
         return { success: false, message: "Registration Failed" };
+    }
+}
+
+export const postLogin = async (user) => {
+    try {
+        const q = "SELECT * FROM users WHERE email = ?"
+        const [rows] = await pool.query(q, user.email);
+        if (rows.length === 0) {
+            return { success: false, errors: [{msg: "Invalid email and/or password."}]};
+        }
+        const creds = rows[0]
+        const passwordMatch = await bcrypt.compare(user.password, creds.password);
+        if (!passwordMatch) {
+            return { success: false, errors: [{msg: "Invalid email and/or password."}]};
+        }
+        const token = jwt.sign(
+            {uid: creds.user_id},
+            process.env.JWT_SECRET,
+            {expiresIn: '1w'}
+        )
+        return { success: true, message: 'Login Successful', token: token }
+    } catch (error) {
+        return { success: false, errors: [{msg: "Server error. Please try again later."}]};
     }
 }

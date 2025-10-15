@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { View, Button, TextInput, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
@@ -12,6 +12,7 @@ import colors from '../theme/colors';
 import fonts from '../theme/fonts';
 import { checkNameField, checkPasswordField, checkUsernameField } from '../utils/checkFieldFunctions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthContext } from '../AuthContext';
 
 const Register = () => {
     const navigation = useNavigation();
@@ -27,6 +28,8 @@ const Register = () => {
         confirmPassword: ''
     });
 
+    const { setAuth } = useContext(AuthContext);
+
     const handleChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
@@ -40,9 +43,7 @@ const Register = () => {
         try {
             const response = await axios.post('http://localhost:8800/api/auth/register', {name, email, password, username, confirmPassword});
             if (response.data.success) {
-                await AsyncStorage.setItem("authToken", response.data.token);
-                await AsyncStorage.setItem("keepLoggedIn", JSON.stringify(true));
-                console.log(response.data);
+                await setAuth(response.data.token);
             }
 
         } catch (error) {
