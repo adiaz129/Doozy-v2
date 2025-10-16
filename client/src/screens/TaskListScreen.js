@@ -20,11 +20,13 @@ import CheckedPost from '../assets/checked-post-sent.svg';
 import colors from '../theme/colors';
 import fonts from '../theme/fonts';
 import { getDueDateString } from '../utils/timeFunctions';
+import { AuthContext } from '../AuthContext';
+
 
 const TaskListScreen = (props) => {
 
     const { navigation } = props;
-
+    const { logout } = useContext(AuthContext); //remove
     const [order, setOrder] = useState("default");
     const [listId, setListId] = useState("0");
     const [taskItems, setTaskItems] = useState([]);
@@ -740,6 +742,7 @@ const TaskListScreen = (props) => {
     }
 
     const testFunction = async () => {
+        await logout();
     }
 
     const uncompleteTaskHelper = (index, complete) => {
@@ -905,7 +908,9 @@ const TaskListScreen = (props) => {
                             </TouchableOpacity>
                             <View style={{ flexDirection: 'row', alignItems: 'center', padding: 1, paddingRight: 5, }}>
                                 <CheckedPost width={42} height={42} />
-                                <Text style={styles.title}>Doozy</Text>
+                                <TouchableOpacity onPress={testFunction}>
+                                    <Text style={styles.title}>Doozy</Text>
+                                </TouchableOpacity>
                             </View>
                             <TouchableOpacity ref={sortRef} onPress={() => { if (Platform.OS === 'ios'){closeSwipeCard(); openSortModal();} else {}}}>
                                 {order === "default" ? 

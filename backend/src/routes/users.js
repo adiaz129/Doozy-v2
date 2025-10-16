@@ -5,4 +5,8 @@ const router = express.Router();
 
 router.get('/', getUsers);
 
+// tasks
+// router.post('/:user_id/tasks', function);
+// router.get('/:user_id/tasks', function);
+
 export default router;
