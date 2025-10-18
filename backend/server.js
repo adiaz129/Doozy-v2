@@ -2,8 +2,9 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import userRoutes from './src/routes/users.js';
+import taskRoutes from './src/routes/tasks.js';
 import authRoutes from './src/routes/auth.js';
-// import taskRoutes from './src/routes/tasks.js';
+import { verifyToken } from './src/middleware/tokenValidation.js';
 import { checkConnection } from './src/config/db.js';
 import { createAllTables } from './src/utils/dbUtils.js';
 
@@ -12,9 +13,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/users', userRoutes);
+app.use('/api/tasks', verifyToken, taskRoutes);
+app.use('/api/users', verifyToken, userRoutes);
 app.use('/api/auth', authRoutes);
-// app.use('/api/tasks', taskRoutes);
 
 app.listen(8800, async () => {
     console.log("Connected to backend!")

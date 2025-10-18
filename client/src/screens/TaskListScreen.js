@@ -1000,6 +1000,7 @@ const TaskListScreen = (props) => {
                             configureNotifications={configureNotifications}
                             scheduleNotifications={scheduleNotifications}
                             isRepeatingTask={isRepeatingTask}
+                            cancelNotifications={cancelNotifications}
                         />
                     </SafeAreaView>
                 </Drawer>

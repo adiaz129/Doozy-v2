@@ -19,11 +19,13 @@ const tasksQuery = `CREATE TABLE IF NOT EXISTS tasks (
     user_id INT NOT NULL,
     task_name VARCHAR(100) NOT NULL,
     description VARCHAR(255) DEFAULT NULL,
-    time_task_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    complete_by_date TIMESTAMP DEFAULT NULL,
+    time_task_created DATETIME NOT NULL DEFAULT (UTC_TIMESTAMP()),
+    complete_by_date DATETIME DEFAULT NULL,
     is_completion_time BOOLEAN DEFAULT FALSE,
     priority INT DEFAULT 0,
     repeat_interval INT DEFAULT NULL,
+    repeat_ends DATETIME DEFAULT NULL,
+    is_completed BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );`;
 
@@ -31,7 +33,7 @@ const listsQuery = `CREATE TABLE IF NOT EXISTS lists (
     list_id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
     list_name VARCHAR(100) NOT NULL,
-    time_list_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    time_list_created DATETIME NOT NULL DEFAULT (UTC_TIMESTAMP()),
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );`;
 
