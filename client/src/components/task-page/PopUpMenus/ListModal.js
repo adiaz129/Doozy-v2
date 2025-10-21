@@ -6,11 +6,12 @@ import { FIREBASE_AUTH, FIRESTORE_DB } from '../../../../firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import colors from '../../../theme/colors';
 import fonts from '../../../theme/fonts';
+import axios from 'axios';
 
 const ListModal = (props) => {
 
   const { selectedLists, setSelectedLists, listItems, setListModalVisible } = props;
-
+  console.log(listItems)
   const currentUser = FIREBASE_AUTH.currentUser;
 
   const [showAddList, setShowAddList] = useState(false);
@@ -54,6 +55,7 @@ const ListModal = (props) => {
   const handleListPress = (currId) => {
     if (selectedLists.includes(currId)) {
       let filteredList = selectedLists.filter(id => id !== currId);
+      console.log("filteredList")
       setSelectedLists(filteredList);
     }
     else {
@@ -65,29 +67,32 @@ const ListModal = (props) => {
     setShowAddList(true);
   }
 
-  const addList = async() => {
-    try {
-      const listRef = doc(collection(FIRESTORE_DB, 'Users', currentUser.uid, 'Lists'));
-      await setDoc(listRef, {name: listInputText, taskIds: [], postIds: [], timeListCreated: new Date()});
-      setSelectedLists([...selectedLists, listRef.id]);
-      setListInputText("");
-      setShowAddList(false);
-    } catch (error){
-      console.error("Error creating list:", error);
+  const addList = async () => {
+        try {
+          console.log("HIIIIII")
+            const response = await axios.post('http://localhost:8800/api/lists', {
+                list_name: listInputText
+            });
+            console.log("HIII")
+            setSelectedLists([...selectedLists, response.data.list_id]);
+            setListInputText("");
+            setShowAddList(false);
+        } catch (error) {
+            console.error(error.response.data.message);
+        }
     }
-  }
 
   const clear = () => {
     setSelectedLists([]);
   }
 
   const renderList = ( item, isLast ) => (
-    <TouchableOpacity onPress={() => { handleListPress(item.id) }} style={{ ...(isLast ? {marginBottom: 20} : {}) , ...(selectedLists.includes(item.id) ? styles.listContainerSelected : {}), ...styles.listContainer }}>
+    <TouchableOpacity onPress={() => { handleListPress(item.list_id) }} style={{ ...(isLast ? {marginBottom: 20} : {}) , ...(selectedLists.includes(item.list_id) ? styles.listContainerSelected : {}), ...styles.listContainer }}>
       <View style={styles.nameContainer}>
-        <Ionicons name="list-outline" size={18} color={selectedLists.includes(item.id) ? (colors.accent) : (colors.primary)} />
-        <Text style={[selectedLists.includes(item.id) ? {color: colors.accent} : {color: colors.primary}, styles.listName]}>{item.name}</Text>
+        <Ionicons name="list-outline" size={18} color={selectedLists.includes(item.list_id) ? (colors.accent) : (colors.primary)} />
+        <Text style={[selectedLists.includes(item.list_id) ? {color: colors.accent} : {color: colors.primary}, styles.listName]}>{item.list_name}</Text>
       </View>
-      {selectedLists.includes(item.id) && (<View>
+      {selectedLists.includes(item.list_id) && (<View>
           <FontAwesome6 name={'check'} size={20} color={colors.accent} />
       </View>)}
     </TouchableOpacity>
@@ -101,7 +106,7 @@ const ListModal = (props) => {
             <Ionicons name="chevron-down-outline" size={32} color={colors.primary} />
           </TouchableOpacity>
           {selectedLists.length !== 0 && <View style={styles.listSelectedContainer}>
-            <Text numberOfLines={1} style={styles.listText}>{listItems.filter(listItem => selectedLists.includes(listItem.id))[0].name}</Text>
+            <Text numberOfLines={1} style={styles.listText}>{listItems.filter(listItem => selectedLists.includes(listItem.list_id))[0].list_name}</Text>
             <Text numberOfLines={1} style={styles.listText}>{selectedLists.length > 1 && ` + ${selectedLists.length - 1} more`}</Text>
           </View>}
           {selectedLists.length > 0 && <TouchableOpacity style={{width: 50}} onPress={() => clear()}>
@@ -115,7 +120,7 @@ const ListModal = (props) => {
                 const isLast = index === listItems.length - 1;
                 return (renderList(item, isLast));
               }}
-              keyExtractor={item => item.id}
+              keyExtractor={item => item.list_id}
               showsVerticalScrollIndicator={true}
             />
             

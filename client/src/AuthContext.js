@@ -62,10 +62,6 @@ const AuthProvider = ({ children }) => {
         getAuthState();
     }, []);
 
-    useEffect(() => {
-        console.log(auth);
-    }, [auth])
-
     return (
         <AuthContext.Provider value={{ auth, setAuth, logout }}>
             {children}

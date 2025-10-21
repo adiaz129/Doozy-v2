@@ -1,4 +1,5 @@
 import { pool } from "../config/db.js";
+import { parseIdList } from "../utils/helperFunctions.js";
 
 export const postTaskToDB = async (task, userId) => {
     const connection = await pool.getConnection();
@@ -20,7 +21,7 @@ export const postTaskToDB = async (task, userId) => {
             const values3 = task.reminders.map(reminderId => [reminderId, result1.insertId]);
             await connection.query(q3, [values3]);
         }
-        
+
         if (Array.isArray(task.notifications) && task.notifications.length > 0) {
             const q4 = "INSERT INTO notifications (notification_id, task_id) VALUES ?";
             const values4 = task.notifications.map(notificationId => [notificationId, result1.insertId]);
@@ -34,5 +35,123 @@ export const postTaskToDB = async (task, userId) => {
         return { success: false, message: 'Task creation failed.' };
     } finally {
         connection.release();
+    }
+}
+
+export const getAllTasksFromDB = async (userId) => {
+    try {
+        const q = `SELECT t.task_id, 
+            t.task_name, 
+            t.description, 
+            t.time_task_created, 
+            t.complete_by_date, 
+            t.is_completion_time, 
+            t.priority, 
+            t.repeat_interval, 
+            t.repeat_ends, 
+            t.is_completed, 
+            GROUP_CONCAT(DISTINCT l.list_id) AS lists,
+            GROUP_CONCAT(DISTINCT r.reminder_id) AS reminders,
+            GROUP_CONCAT(DISTINCT n.notification_id) AS notifications
+            FROM tasks t
+            LEFT JOIN task_list tl ON t.task_id = tl.task_id
+            LEFT JOIN lists l ON tl.list_id = l.list_id
+            LEFT JOIN reminders r ON t.task_id = r.task_id
+            LEFT JOIN notifications n ON t.task_id = n.task_id
+            WHERE t.user_id = (?)
+            GROUP BY t.task_id;`;
+        const values = [userId];
+        const [result] = await pool.query(q, values);
+        const parsedResult = result.map(task => ({
+            ...task,
+            is_completed: !!task.is_completed,
+            lists: parseIdList(task.lists),
+            reminders: parseIdList(task.reminders),
+            notifications: parseIdList(task.notifications),
+        }))
+
+        return {success: true, message: 'Get all tasks request successful', data: parsedResult};
+    } catch (error) {
+        console.error(error)
+        return {success: false, message: 'Failed to get all tasks'};
+    }
+}
+
+export const getTasksByListIdFromDB = async (listId, userId) => {
+    try {
+        const q = `SELECT t.task_id, 
+            t.task_name, 
+            t.description, 
+            t.time_task_created, 
+            t.complete_by_date, 
+            t.is_completion_time, 
+            t.priority, 
+            t.repeat_interval, 
+            t.repeat_ends, 
+            t.is_completed, 
+            GROUP_CONCAT(DISTINCT l.list_id) AS lists,
+            GROUP_CONCAT(DISTINCT r.reminder_id) AS reminders,
+            GROUP_CONCAT(DISTINCT n.notification_id) AS notifications
+            FROM tasks t
+            JOIN task_list tl_filter ON t.task_id = tl_filter.task_id
+            JOIN lists l_filter ON tl_filter.list_id = l_filter.list_id AND l_filter.list_id = (?)
+            LEFT JOIN task_list tl ON t.task_id = tl.task_id
+            LEFT JOIN lists l ON tl.list_id = l.list_id
+            LEFT JOIN reminders r ON t.task_id = r.task_id
+            LEFT JOIN notifications n ON t.task_id = n.task_id
+            WHERE t.user_id = (?)
+            GROUP BY t.task_id;`;
+        const values = [listId, userId];
+        const [result] = await pool.query(q, values);
+        const parsedResult = result.map(task => ({
+            ...task,
+            is_completed: !!task.is_completed,
+            lists: parseIdList(task.lists),
+            reminders: parseIdList(task.reminders),
+            notifications: parseIdList(task.notifications),
+        }))
+
+        return {success: true, message: 'Get tasks by list id request successful', data: parsedResult};
+    } catch (error) {
+        return {success: false, message: 'Failed to get tasks by list id'};
+    }
+}
+
+export const getTaskByIdFromDB = async (taskId, userId) => {
+    try {
+        const q = `SELECT t.task_id, 
+            t.task_name, 
+            t.description, 
+            t.time_task_created, 
+            t.complete_by_date, 
+            t.is_completion_time, 
+            t.priority, 
+            t.repeat_interval, 
+            t.repeat_ends, 
+            t.is_completed, 
+            GROUP_CONCAT(DISTINCT l.list_id) AS lists,
+            GROUP_CONCAT(DISTINCT reminder_id) AS reminders,
+            GROUP_CONCAT(DISTINCT notification_id) AS notifications
+            FROM tasks t
+            LEFT JOIN task_list tl ON t.task_id = tl.task_id
+            LEFT JOIN lists l ON tl.list_id = l.list_id
+            LEFT JOIN reminders r ON t.task_id = r.task_id
+            LEFT JOIN notifications n ON t.task_id = n.task_id
+            WHERE t.task_id = (?) AND t.user_id = (?)
+            GROUP BY t.task_id;`;
+
+        const values = [taskId, userId];
+        const [result] = await pool.query(q, values);
+        const parsedResult = result.map(task => ({
+            ...task,
+            is_completed: !!task.is_completed,
+            lists: parseIdList(task.lists),
+            reminders: parseIdList(task.reminders),
+            notifications: parseIdList(task.notifications),
+        }))
+
+        return {success: true, message: 'Get task by id successful', data: parsedResult};
+    } catch (error) {
+        return {success: false, message: 'Failed to get task by id'};
     }
 }

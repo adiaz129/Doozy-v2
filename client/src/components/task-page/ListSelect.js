@@ -5,11 +5,12 @@ import { arrayRemove, collection, doc, setDoc, updateDoc, writeBatch } from "fir
 import { FIREBASE_AUTH, FIRESTORE_DB } from "../../../firebaseConfig";
 import colors from '../../theme/colors';
 import fonts from '../../theme/fonts';
+import axios from 'axios';
 
 
 const ListSelect = (props) => {
-    const {setOpenDrawer, listItems, listId, setListId, userProfile, navigation} = props;
-    const allListItems = [{id: "0", name: 'Master List', taskNumber: userProfile ? userProfile.tasks : 0}, ...listItems]
+    const {setOpenDrawer, listItems, listId, setListId, userProfile} = props; // change to count(task_id)
+    const allListItems = [{list_id: 0, list_name: 'Master List', taskNumber: userProfile ? userProfile.tasks : 0}, ...listItems]
     const [addListModalVisible, setAddListModalVisible] = useState(false);
     const [listName, setListName] = useState("");
     const [listMenuModalVisible, setListMenuModalVisible] = useState(false);
@@ -68,12 +69,14 @@ const ListSelect = (props) => {
 
     const addList = async () => {
         try {
-            const listRef = doc(collection(FIRESTORE_DB, 'Users', currentUser.uid, 'Lists'));
-            await setDoc(listRef, {name: listName, postIds: [], taskIds: [], timeListCreated: new Date()});
+            const response = await axios.post('http://localhost:8800/api/lists', {
+                list_name: listName
+            });
             dismissModal();
-            setListId(listRef.id);
+            console.log(response.data)
+            setListId(response.data.list_id);
         } catch (error) {
-            console.error("Error adding list:", error)
+            console.error(error.response.data.message);
         }
     }
 
@@ -107,7 +110,7 @@ const ListSelect = (props) => {
             setListMenuModalVisible(false);
             setCurrList(null)
             if (listId == list.id) {
-                setListId("0");
+                setListId(0);
             }
         } catch (error) {
             console.error("Error deleting list:", error);
@@ -115,7 +118,7 @@ const ListSelect = (props) => {
     }
 
     const toggleListMenu = (item) => {
-        listItemRefs.current[item.id]?.measure((x, y, width, height, pageX, pageY) => {
+        listItemRefs.current[item.list_id]?.measure((x, y, width, height, pageX, pageY) => {
             setCurrYPosition(pageY);
         });
         setListMenuModalVisible(true);
@@ -125,22 +128,22 @@ const ListSelect = (props) => {
     const renderList = ({ item }) => (
         <TouchableOpacity ref={ref => {
             if (ref) {
-                listItemRefs.current[item.id] = ref;
+                listItemRefs.current[item.list_id] = ref;
             } else {
-                delete listItemRefs.current[item.id];
+                delete listItemRefs.current[item.list_id];
             }}}
-            onPress={() => {setOpenDrawer(false); setListId(item.id)}} 
-            style={{...(item.id == listId ? styles.listContainerSelected : {}), ...styles.listContainer}}
+            onPress={() => {setOpenDrawer(false); setListId(item.list_id)}} 
+            style={{...(item.list_id == listId ? styles.listContainerSelected : {}), ...styles.listContainer}}
         >
             <View style={styles.nameContainer}>
                 <Ionicons name="list-outline" size={18} color={colors.primary} />
-                <Text style={styles.listName}>{item.name}</Text>
+                <Text style={styles.listName}>{item.list_name}</Text>
             </View>
-            {item.id == '0' ? 
+            {item.list_id == 0 ? 
                 (<Text style={styles.taskNumber}>{item.taskNumber}</Text>) 
             : (
                 <TouchableOpacity onPress={() => toggleListMenu(item)} style={{ height: 50, flexDirection: 'row', justifyContent: 'center', paddingHorizontal: 10, alignItems: 'center' }}>
-                    {currList && currList.id === item.id ?
+                    {currList && currList.list_id === item.list_id ?
                         (currYPosition * 2 > screenHeight ? 
                             (<Ionicons name="chevron-up-outline" size={18} color={colors.primary} />)
                         :
@@ -209,7 +212,7 @@ const ListSelect = (props) => {
             <FlatList 
                 data={allListItems}
                 renderItem={renderList}
-                keyExtractor={item => item.id}
+                keyExtractor={item => item.list_id}
             />
             <TouchableOpacity onPress={openModal} style={styles.addListButton}>
                 <Ionicons name="add-circle-outline" size={28} color={colors.primary} />

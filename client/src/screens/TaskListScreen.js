@@ -21,6 +21,7 @@ import colors from '../theme/colors';
 import fonts from '../theme/fonts';
 import { getDueDateString } from '../utils/timeFunctions';
 import { AuthContext } from '../AuthContext';
+import axios from 'axios';
 
 
 const TaskListScreen = (props) => {
@@ -28,7 +29,7 @@ const TaskListScreen = (props) => {
     const { navigation } = props;
     const { logout } = useContext(AuthContext); //remove
     const [order, setOrder] = useState("default");
-    const [listId, setListId] = useState("0");
+    const [listId, setListId] = useState(0);
     const [taskItems, setTaskItems] = useState([]);
     const [completedTaskItems, setCompletedTaskItems] = useState([]);
     const [listItems, setListItems] = useState([]);
@@ -51,68 +52,41 @@ const TaskListScreen = (props) => {
 
     const [selectedLists, setSelectedLists] = useState([]);
 
-
-    // useEffect(() => {
-    //     const unsubscribeTasks = fetchTasks();
-    //     const unsubscribePosts = fetchPosts();
-    //     const unsubscribeLists = fetchLists();
-    //     const unsubscribeUserProfile = fetchUserProfile();
-
-    //     unsubscribeRef.current = [unsubscribeTasks, unsubscribePosts, unsubscribeLists, unsubscribeUserProfile];
-    //     return () => {
-    //         unsubscribeRef.current.forEach(unsub => unsub());
-    //     };
-    // }, [listId, refreshing]);
+    useEffect(() => {
+        fetchTasks();
+        fetchLists();
+    }, [listId, refreshing]); // change so that theres a fetch on evry get, post, delete, update
 
     useEffect(() => {
-        //sortTasks(taskItems);
+        sortTasks(taskItems);
     }, [order, taskItems]);
 
-    function fetchTasks() {
-        let unsubscribeTasks = () => { };
-        let unsubscribeList = () => { };
-        let taskIds = [];
-
-        const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-        const tasksRef = collection(userProfileRef, 'Tasks');
-        const listRef = doc(userProfileRef, 'Lists', listId);
-
+    const fetchTasks = async () => {
         try {
-            unsubscribeList = onSnapshot(listRef, (listSnap) => {
-                taskIds = listSnap.exists() ? listSnap.data().taskIds : [];
-                unsubscribeTasks = onSnapshot(tasksRef, (querySnapshotTasks) => {
-                    const fetchedTasks = [];
-                    querySnapshotTasks.forEach((doc) => {
-                        let docData = doc.data();
-                        if (!listSnap.exists() || taskIds.includes(doc.id)) {
-                            if (docData.completeByDate?.timestamp) {
-                                const millisCompleteBy = docData.completeByDate.timestamp.seconds * 1000 + Math.floor(docData.completeByDate.timestamp.nanoseconds / 1e6);
-                                docData.completeByDate = {
-                                    ...docData.completeByDate,
-                                    timestamp: new Date(millisCompleteBy)
-                                }
-                            }
-                            if (docData.repeatEnds) {
-                                const millisRepeatEnds = docData.repeatEnds.seconds * 1000 + Math.floor(docData.repeatEnds.nanoseconds / 1e6);
-                                docData.repeatEnds = new Date(millisRepeatEnds);
-                            }
-                            fetchedTasks.push({ id: doc.id, ...docData });
-                        }
-                    });
-                    sortTasks(fetchedTasks);
-                })
-            })
+            let response;
+            if (listId !== 0) {
+                response = await axios.get(`http://localhost:8800/api/tasks:${listId}`);
+            }
+            else {
+                response = await axios.get(`http://localhost:8800/api/tasks`);
+            }
+            console.log(response.data.data);
+            const fetchedTasks = response.data.data.map(task => ({
+                ...task,
+                time_task_created: new Date(task.time_task_created),
+                complete_by_date: task.complete_by_date ? new Date(task.complete_by_date) : null,
+                repeat_ends: task.repeat_ends ? new Date(task.repeat_ends) : null,
+            }));
+            sortTasks(fetchedTasks);
         } catch (error) {
-            console.error("Error fetching tasks:", error);
+            console.error("Error fetching tasks:",  error.response.data.message);
         }
-
-        return () => { unsubscribeTasks(); unsubscribeList; };
     }
 
     const onRefresh = () => {
     setRefreshing(true);
     setTimeout(() => {
-      setRefreshing(false);
+        setRefreshing(false);
     }, 500);
   };
 
@@ -158,32 +132,24 @@ const TaskListScreen = (props) => {
     }
 
 
-    function fetchLists() {
-        const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-        const listsRef = collection(userProfileRef, 'Lists');
-        queryListsRef = query(listsRef, orderBy('timeListCreated', 'desc'));
+    const fetchLists = async () => {
         try {
-            const unsubscribeLists = onSnapshot(queryListsRef,
-                (querySnapshotLists) => {
-                    const fetchedLists = [];
-                    querySnapshotLists.forEach((doc) => {
-                        fetchedLists.push({ id: doc.id, ...doc.data() });
-                    });
-                    setListItems(fetchedLists);
-                    const foundList = fetchedLists.find((fetchedList) => fetchedList.id === listId);
-                    if (listId === "0") {
-                        setCurrList("Master List");
-                        setSelectedLists([]);
-                    }
-                    else if (foundList){
-                        setCurrList(foundList.name);
-                        setSelectedLists([foundList.id]);
-                    }
-                    else {
-                        setCurrList("Master List");
-                    }
-                });
-            return unsubscribeLists;
+            const response = await axios.get(`http://localhost:8800/api/lists`);
+            console.log("list",response.data.data)
+            const fetchedLists = response.data.data.map(list => ({
+                ...list,
+                time_list_created: new Date(list.time_list_created)
+            }));
+            setListItems(fetchedLists);
+            const foundList = fetchedLists.find((fetchedList) => fetchedList.list_id === listId);
+            if (listId === 0) {
+                setCurrList("Master List");
+                setSelectedLists([]);
+            }
+            else {
+                setCurrList(foundList.list_name);
+                setSelectedLists([foundList.list_id]);
+            }
         } catch (error) {
             console.error("Error fetching lists:", error);
         }
@@ -210,27 +176,28 @@ const TaskListScreen = (props) => {
         }
         return true;
     }
-
+// sort not working!!!!!!!
     const sortTasks = (fetchedTasks) => {
         let sortedFetchedTasks = [];
+        console.log(taskItems);
         if (order == "default") { //completeByDate -> priority -> timeTaskCreated
             sortedFetchedTasks = fetchedTasks.slice().sort((a, b) => {
-                if (!a.completeByDate && b.completeByDate) {
+                if (!a.complete_by_date && b.complete_by_date) {
                     return 1
                 }
-                else if (a.completeByDate && !b.completeByDate) {
+                else if (a.complete_by_date && !b.complete_by_date) {
                     return -1
                 }
-                else if ((!a.completeByDate && !b.completeByDate) || (a.completeByDate && b.completeByDate && a.completeByDate.timestamp === b.completeByDate.timestamp)) {
+                else if ((!a.complete_by_date && !b.complete_by_date) || (a.complete_by_date && b.complete_by_date && a.complete_by_date === b.complete_by_date)) {
                     if (a.priority - b.priority !== 0) {
                         return b.priority - a.priority;
                     }
                     else {
-                        return b.timeTaskCreated - a.timeTaskCreated;
+                        return b.time_task_created - a.time_task_created;
                     }
                 }
                 else {
-                    return a.completeByDate.timestamp - b.completeByDate.timestamp;
+                    return a.complete_by_date - b.complete_by_date;
                 }
             })
         }
@@ -240,34 +207,37 @@ const TaskListScreen = (props) => {
                     return b.priority - a.priority;
                 }
                 else {
-                    return b.timeTaskCreated - a.timeTaskCreated;
+                    return b.time_task_created - a.time_task_created;
                 }
             })
         }
         else if (order == "dueDate") { // completeByDate -> timeTaskCreated
             sortedFetchedTasks = fetchedTasks.slice().sort((a, b) => {
-                if (!a.completeByDate && b.completeByDate) {
+                if (!a.complete_by_date && b.complete_by_date) {
                     return 1
                 }
-                else if (a.completeByDate && !b.completeByDate) {
+                else if (a.complete_by_date && !b.complete_by_date) {
                     return -1
                 }
-                else if ((!a.completeByDate && !b.completeByDate) || (a.completeByDate && b.completeByDate && a.completeByDate.timestamp === b.completeByDate.timestamp)) {
-                    return b.timeTaskCreated - a.timeTaskCreated;
+                else if ((!a.complete_by_date && !b.complete_by_date) || (a.completeByDate && b.completeByDate && a.completeByDate.timestamp === b.completeByDate.timestamp)) {
+                    return b.time_task_created - a.time_task_created;
                 }
                 else {
-                    return a.completeByDate.timestamp - b.completeByDate.timestamp;
+                    return a.complete_by_date - b.complete_by_date;
                 }
             })
         }
         else { // name
             sortedFetchedTasks = fetchedTasks.slice().sort((a, b) => {
-                return a.taskName.localeCompare(b.taskName);
+                return a.task_name.localeCompare(b.task_name);
             })
         }
+        console.log(sortedFetchedTasks);
         if (arraysAreEqual(sortedFetchedTasks, taskItems)) {
+            console.log("HUUH")
             return;
         }
+        console.log(sortedFetchedTasks)
         setTaskItems(sortedFetchedTasks);
     }
 
@@ -761,8 +731,8 @@ const TaskListScreen = (props) => {
         // if dueDate show dueDate only
         // if name show same as default
 
-        if (task.completeByDate) {
-            return [task.priority, getDueDateString(task.completeByDate.timestamp, task.isCompletionTime)];
+        if (task.complete_by_date) {
+            return [task.priority, getDueDateString(task.complete_by_date, task.is_completion_time)];
         }
         else {
             return [task.priority, null];
@@ -778,7 +748,7 @@ const TaskListScreen = (props) => {
                     onOpen={() => { closeSwipeCard(); setOpenDrawer(true); }}
                     onClose={() => setOpenDrawer(false)}
                     renderDrawerContent={() => {
-                        return <ListSelect setOpenDrawer={setOpenDrawer} listItems={listItems} listId={listId} setListId={setListId} userProfile={userProfile} navigation={navigation} />;
+                        return <ListSelect setOpenDrawer={setOpenDrawer} listItems={listItems} listId={listId} setListId={setListId} userProfile={userProfile} />;
                     }}
                     drawerStyle={{
                         width: '70%',
@@ -945,7 +915,7 @@ const TaskListScreen = (props) => {
                                         return (
                                             <TouchableOpacity onPress={() => Platform.OS === 'ios'?  handleTaskPress(index) : {}} key={index} style={[styles.taskContainer, isFirst && styles.firstTask, isLast && styles.lastTask]}>
                                                 <Task
-                                                    text={task.taskName}
+                                                    text={task.task_name}
                                                     tick={completeTask}
                                                     i={index}
                                                     complete={false}
