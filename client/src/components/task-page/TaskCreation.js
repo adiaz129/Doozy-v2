@@ -71,6 +71,7 @@ const TaskCreation = (props) => {
     }, []);
 
     const storeTask = async (image, post) => {
+        console.log("HIHWIFHWIFH")
         try {
             let notifications = []
             if (reminders.length !== 0) {
@@ -80,14 +81,17 @@ const TaskCreation = (props) => {
             }
             let mysqlTimestampCompleteBy;
             let mysqlTimestampRepeatEnds;
+            console.log(complete_by_date);
+
             if (complete_by_date) {
-                const dateObj1 = new Date(complete_by_date.timestamp);
-                mysqlTimestampCompleteBy = dateObj1.toISOString().slice(0, 19).replace('T', ' ');
+                mysqlTimestampCompleteBy = new Date(complete_by_date).toISOString().slice(0, 19).replace('T', ' ');
+                console.log(mysqlTimestampCompleteBy);
             }
             if (repeat_ends) {
-                const dateObj2 = new Date(repeat_ends);
-                mysqlTimestampRepeatEnds = dateObj2.toISOString().slice(0, 19).replace('T', ' ');
+                mysqlTimestampRepeatEnds = new Date(repeat_ends).toISOString().slice(0, 19).replace('T', ' ');
             }
+            console.log("RIGHT HERE")
+            console.log(mysqlTimestampCompleteBy)
             const response = await axios.post('http://localhost:8800/api/tasks', {
                     task_name, 
                     description, 

@@ -65,18 +65,19 @@ const TaskListScreen = (props) => {
         try {
             let response;
             if (listId !== 0) {
-                response = await axios.get(`http://localhost:8800/api/tasks:${listId}`);
+                console.log("HJERE")
+                response = await axios.get(`http://localhost:8800/api/tasks?listId=${listId}`);
             }
             else {
                 response = await axios.get(`http://localhost:8800/api/tasks`);
             }
-            console.log(response.data.data);
             const fetchedTasks = response.data.data.map(task => ({
                 ...task,
                 time_task_created: new Date(task.time_task_created),
                 complete_by_date: task.complete_by_date ? new Date(task.complete_by_date) : null,
                 repeat_ends: task.repeat_ends ? new Date(task.repeat_ends) : null,
             }));
+            console.log(fetchedTasks)
             sortTasks(fetchedTasks);
         } catch (error) {
             console.error("Error fetching tasks:",  error.response.data.message);
@@ -135,7 +136,6 @@ const TaskListScreen = (props) => {
     const fetchLists = async () => {
         try {
             const response = await axios.get(`http://localhost:8800/api/lists`);
-            console.log("list",response.data.data)
             const fetchedLists = response.data.data.map(list => ({
                 ...list,
                 time_list_created: new Date(list.time_list_created)
@@ -172,14 +172,13 @@ const TaskListScreen = (props) => {
     const arraysAreEqual = (arr1, arr2) => {
         if (arr1.length !== arr2.length) return false;
         for (let i = 0; i < arr1.length; i++) {
-            if (arr1[i].id !== arr2[i].id) return false;
+            if (arr1[i].task_id !== arr2[i].task_id) return false;
         }
         return true;
     }
-// sort not working!!!!!!!
+
     const sortTasks = (fetchedTasks) => {
         let sortedFetchedTasks = [];
-        console.log(taskItems);
         if (order == "default") { //completeByDate -> priority -> timeTaskCreated
             sortedFetchedTasks = fetchedTasks.slice().sort((a, b) => {
                 if (!a.complete_by_date && b.complete_by_date) {
@@ -232,12 +231,9 @@ const TaskListScreen = (props) => {
                 return a.task_name.localeCompare(b.task_name);
             })
         }
-        console.log(sortedFetchedTasks);
         if (arraysAreEqual(sortedFetchedTasks, taskItems)) {
-            console.log("HUUH")
             return;
         }
-        console.log(sortedFetchedTasks)
         setTaskItems(sortedFetchedTasks);
     }
 
@@ -565,7 +561,7 @@ const TaskListScreen = (props) => {
         let notificationArray = [];
         if (!isTime) {
             selectedReminders.forEach(reminder => {
-                let date = new Date(selectedDate.timestamp.getTime());
+                let date = new Date(selectedDate.getTime());
                 let body;
                 date.setHours(9);
                 date.setMinutes(0);
@@ -574,19 +570,19 @@ const TaskListScreen = (props) => {
                     body = "Today";
                 }
                 else if (reminder == 1) {
-                    date.setDate(selectedDate.timestamp.getDate() - 1);
+                    date.setDate(selectedDate.getDate() - 1);
                     body = "Tomorrow"
                 }
                 else if (reminder == 2) {
-                    date.setDate(selectedDate.timestamp.getDate() - 2);
+                    date.setDate(selectedDate.getDate() - 2);
                     body = "In 2 days";
                 }
                 else if (reminder == 3) {
-                    date.setDate(selectedDate.timestamp.getDate() - 3);
+                    date.setDate(selectedDate.getDate() - 3);
                     body = "In 3 days";
                 }
                 else {
-                    date.setDate(selectedDate.timestamp.getDate() - 7);
+                    date.setDate(selectedDate.getDate() - 7);
                     body = "In 1 week"
                 }
                 if (date > new Date()) {
@@ -596,22 +592,22 @@ const TaskListScreen = (props) => {
         }
         else {
             selectedReminders.forEach(reminder => {
-                let date = new Date(selectedDate.timestamp.getTime());
+                let date = new Date(selectedDate.getTime());
                 const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 let body;
                 if (reminder == 0) {
                     body = "Now, " + timeString;
                 }
                 else if (reminder == 1) {
-                    date.setMinutes(selectedDate.timestamp.getMinutes() - 5);
+                    date.setMinutes(selectedDate.getMinutes() - 5);
                     body = "In 5 minutes, " + timeString;
                 }
                 else if (reminder == 2) {
-                    date.setMinutes(selectedDate.timestamp.getMinutes() - 30);
+                    date.setMinutes(selectedDate.getMinutes() - 30);
                     body = "In 30 minutes, " + timeString;
                 }
                 else if (reminder == 3) {
-                    date.setHours(selectedDate.timestamp.getHours() - 1);
+                    date.setHours(selectedDate.getHours() - 1);
                     body = "in 1 hour, " + timeString;
                 }
                 else {

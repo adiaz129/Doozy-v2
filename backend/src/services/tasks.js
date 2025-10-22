@@ -4,7 +4,6 @@ import { parseIdList } from "../utils/helperFunctions.js";
 export const postTaskToDB = async (task, userId) => {
     const connection = await pool.getConnection();
     try {
-
         await connection.beginTransaction();
         const q1 = "INSERT INTO tasks (user_id, task_name, description, complete_by_date, is_completion_time, priority, repeat_interval, repeat_ends, is_completed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         const values1 = [userId, task.task_name, task.description, task.complete_by_date, task.is_completion_time, task.priority, task.repeat_interval, task.repeat_ends, task.is_completed];
@@ -31,6 +30,7 @@ export const postTaskToDB = async (task, userId) => {
         await connection.commit();
         return { success: true, message: "Task created successfully." };
     } catch (error) {
+        console.log(error);
         await connection.rollback();
         return { success: false, message: 'Task creation failed.' };
     } finally {
@@ -65,6 +65,7 @@ export const getAllTasksFromDB = async (userId) => {
         const parsedResult = result.map(task => ({
             ...task,
             is_completed: !!task.is_completed,
+            is_completion_time: !!task.is_completion_time,
             lists: parseIdList(task.lists),
             reminders: parseIdList(task.reminders),
             notifications: parseIdList(task.notifications),
@@ -106,6 +107,7 @@ export const getTasksByListIdFromDB = async (listId, userId) => {
         const parsedResult = result.map(task => ({
             ...task,
             is_completed: !!task.is_completed,
+            is_completion_time: !!task.is_completion_time,
             lists: parseIdList(task.lists),
             reminders: parseIdList(task.reminders),
             notifications: parseIdList(task.notifications),
@@ -145,6 +147,7 @@ export const getTaskByIdFromDB = async (taskId, userId) => {
         const parsedResult = result.map(task => ({
             ...task,
             is_completed: !!task.is_completed,
+            is_completion_time: !!task.is_completion_time,
             lists: parseIdList(task.lists),
             reminders: parseIdList(task.reminders),
             notifications: parseIdList(task.notifications),

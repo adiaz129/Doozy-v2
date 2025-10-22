@@ -19,24 +19,24 @@ const EditTask = (props) => {
 
     const priorityRef = useRef(null);
 
-    const [editedTaskName, setEditedTaskName] = useState(task ? task.taskName : null);
+    const [editedTaskName, setEditedTaskName] = useState(task ? task.task_name : null);
     const [editedDescription, setEditedDescription] = useState(task ? task.description : null);
     const [isComplete, setComplete] = useState(false);
 
     const [priorityYPosition, setPriorityYPosition] = useState(0);
-
+    
     const [isSaveChangesModalVisible, setSaveChangesModalVisible] = useState(false);
     const [isDeleteTaskModalVisible, setDeleteTaskModalVisible] = useState(false);
     const [isCalendarModalVisible, setCalendarModalVisible] = useState(false);
     const [isListModalVisible, setListModalVisible] = useState(false);
     const [isPriorityModalVisible, setPriorityModalVisible] = useState(false);
-    const [selectedDate, setSelectedDate] = useState(task ? task.completeByDate : null);
-    const [isTime, setIsTime] = useState(task ? task.isCompletionTime : null);
+    const [selectedDate, setSelectedDate] = useState(task ? task.complete_by_date : null);
+    const [isTime, setIsTime] = useState(task ? task.is_completion_time : null);
     const [selectedReminders, setSelectedReminders] = useState(task ? task.reminders : null);
-    const [selectedRepeat, setSelectedRepeat] = useState(task ? task.repeat : null)
-    const [dateRepeatEnds, setDateRepeatEnds] = useState(task ? task.repeatEnds : null);
+    const [selectedRepeat, setSelectedRepeat] = useState(task ? task.repeat_interval : null)
+    const [dateRepeatEnds, setDateRepeatEnds] = useState(task ? task.repeat_ends : null);
     const [selectedPriority, setSelectedPriority] = useState(task ? task.priority : null);
-    const [selectedLists, setSelectedLists] = useState(task ? task.listIds : null)
+    const [selectedLists, setSelectedLists] = useState(task ? task.lists : null)
 
     const [cameraOptionModalVisible, setCameraOptionModalVisible] = useState(false);
     const [resolver, setResolver] = useState(null);
@@ -255,16 +255,16 @@ const EditTask = (props) => {
 
     const discardChangesConfirmation = () => {
         if (task &&
-            task.taskName !== editedTaskName ||
+            task.task_name !== editedTaskName ||
             task.description !== editedDescription ||
             isComplete ||
-            task.completeByDate !== selectedDate ||
-            task.isCompletionTime !== isTime || 
+            task.complete_by_date !== selectedDate ||
+            task.is_completion_time !== isTime || 
             task.reminders !== selectedReminders ||
-            task.repeat !== selectedRepeat ||
-            task.repeatEnds !== dateRepeatEnds ||
+            task.repeat_interval !== selectedRepeat ||
+            task.repeat_ends !== dateRepeatEnds ||
             task.priority !== selectedPriority || 
-            task.listIds !== selectedLists
+            task.lists !== selectedLists
         ) {
             setSaveChangesModalVisible(true);
         }
@@ -412,7 +412,7 @@ const EditTask = (props) => {
                             <Ionicons name="chevron-down-outline" size={32} color={colors.primary} />
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setListModalVisible(true)} style={styles.listButton}>
-                            <Text numberOfLines={1} ellipsizeMode="tail" style={styles.listPicker}>{selectedLists.length == 0 ? "No Lists Selected" : listItems.find(item => item.id == selectedLists[0]).name + (selectedLists.length == 1 ? "" : ", ...")}</Text>
+                            <Text numberOfLines={1} ellipsizeMode="tail" style={styles.listPicker}>{selectedLists.length == 0 ? "No Lists Selected" : listItems.find(item => item.list_id == selectedLists[0]).list_name + (selectedLists.length == 1 ? "" : ", ...")}</Text>
                             <Ionicons name="chevron-down-outline" size={18} color={colors.primary}/>
                         </TouchableOpacity>
                         <TouchableOpacity style={{ width: 50, alignItems: 'center' }} onPress={() => saveChanges()}>
@@ -430,9 +430,9 @@ const EditTask = (props) => {
                         <TouchableOpacity style={styles.dateContainer} onPress={() => { setCalendarModalVisible(true) }}>
                             <Text style={styles.timePicker}>Due Date:</Text>
                             {isTime ? (
-                                <Text style={styles.timePicker}>{getDateString(selectedDate.timestamp)}, {getTimeString(selectedDate.timestamp)}</Text>
+                                <Text style={styles.timePicker}>{getDateString(selectedDate)}, {getTimeString(selectedDate)}</Text>
                             ) : selectedDate ? (
-                                <Text style={styles.timePicker}>{getDateString(selectedDate.timestamp)}</Text>
+                                <Text style={styles.timePicker}>{getDateString(selectedDate)}</Text>
                             ) : (
                                 <Text style={styles.timePicker}>No time set</Text>
                             )
