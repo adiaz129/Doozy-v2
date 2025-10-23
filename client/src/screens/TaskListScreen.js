@@ -65,7 +65,6 @@ const TaskListScreen = (props) => {
         try {
             let response;
             if (listId !== 0) {
-                console.log("HJERE")
                 response = await axios.get(`http://localhost:8800/api/tasks?listId=${listId}`);
             }
             else {
@@ -77,8 +76,14 @@ const TaskListScreen = (props) => {
                 complete_by_date: task.complete_by_date ? new Date(task.complete_by_date) : null,
                 repeat_ends: task.repeat_ends ? new Date(task.repeat_ends) : null,
             }));
-            console.log(fetchedTasks)
-            sortTasks(fetchedTasks);
+            const fetchedIncompletedTasks = fetchedTasks.filter((task) => {
+                return !task.is_completed;
+            })
+            const fetchedCompletedTasks = fetchedTasks.filter((task) => {
+                return task.is_completed;
+            })
+            sortTasks(fetchedIncompletedTasks);
+            setCompletedTaskItems(fetchedCompletedTasks);
         } catch (error) {
             console.error("Error fetching tasks:",  error.response.data.message);
         }
@@ -238,43 +243,11 @@ const TaskListScreen = (props) => {
     }
 
     const completeTask = async (index, complete) => { // clean this
-        const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-        const tasksRef = collection(userProfileRef, 'Tasks');
-        const postsRef = collection(FIRESTORE_DB, 'Posts');
-        const listsRef = collection(userProfileRef, 'Lists');
         if (!complete) { // task --> post
             const task = taskItems[index];
             try {
-                const batch = writeBatch(FIRESTORE_DB);
-                const docId = task.id;
-                const listIds = task.listIds;
-                const postRef = doc(postsRef);
-                batch.set(postRef, { // store post
-                    userId: currentUser.uid,
-                    postName: task.taskName,
-                    description: task.description,
-                    timePosted: new Date(),
-                    priority: task.priority,
-                    reminders: task.reminders,
-                    completeByDate: task.completeByDate,
-                    isCompletionTime: task.isCompletionTime,
-                    listIds: task.listIds,
-                    timeTaskCreated: task.timeTaskCreated,
-                    image: null,
-                    hidden: false,
-                    likeCount: 0,
-                    commentCount: 0,
-                })
-
-                let listRef;
-                listIds.forEach((listId) => { // add post to same lists
-                    listRef = doc(listsRef, listId);
-                    batch.update(listRef, { postIds: arrayUnion(postRef.id) });
-                })
-
-                batch.update(userProfileRef, { posts: increment(1) }); // increment post count
-
                 let imageURI;
+                let post = true;
                 if (Platform.OS === 'android') { //TEMPORARY FIX
                     imageURI = await addImage();
                 }
@@ -299,7 +272,7 @@ const TaskListScreen = (props) => {
                         }
                         else if (cameraOption == 'no post') {
                             imageURI = null;
-                            batch.update(postRef, { hidden: true });
+                            post = false;
                             break;
                         }
                         else {
@@ -309,39 +282,57 @@ const TaskListScreen = (props) => {
                     }
                     setCameraOptionModalVisible(false);
                 }
-                await cancelNotifications(task.notificationIds); // cancel any upcoming notifications
+                // BASICALLY i should just do a patch and i check the complete by date in the backend and post a post based on post flag
+                // a couple of cases to consider
+                // no matter what a task will be updated
+                // if (task.completeByDate && (newCompleteByDate = isRepeatingTask(task.completeByDate.timestamp, task.repeatEnds, task.repeat)))
+                // then i need to post a new task but i should add this check in the backend
+                // if user wants to post then set post true and a post should be posted and handled in the backend
 
-                const taskRef = doc(tasksRef, task.id);
+                 // cancel any upcoming notifications PUT IT LATERRRRRQ!!!!!!!!!!!
+
                 let newCompleteByDate;
-                if (task.completeByDate && (newCompleteByDate = isRepeatingTask(task.completeByDate.timestamp, task.repeatEnds, task.repeat))) {// check if task repeats and return next possible date
-                    batch.update(taskRef, { completeByDate: newCompleteByDate }); // set new completebydate, add one to post child counter, should be on its youngest child meaning no child has been uncompleted
+                let tempNotifIds = [];
+                if (task.complete_by_date && (newCompleteByDate = isRepeatingTask(task.complete_by_date, task.repeat_ends, task.repeat_interval))) {// check if task repeats and return next possible date
                     if (task.reminders.length !== 0) { // schedule notifications
                         if (await configureNotifications()) {
-                            const tempNotifIds = await scheduleNotifications(task.reminders, newCompleteByDate, task.isCompletionTime, task.taskName);
-                            batch.update(taskRef, { notificationIds: tempNotifIds });
+                            tempNotifIds = await scheduleNotifications(task.reminders, newCompleteByDate, task.is_co, task.task_name);
                         }
                     }
                 }
-                else { // if task does not repeat
-                    batch.delete(taskRef);
-                    batch.update(userProfileRef, { tasks: increment(-1) });
-                    listIds.forEach((listId) => { // remove task from lists
-                        listRef = doc(listsRef, listId);
-                        batch.update(listRef, { taskIds: arrayRemove(docId) });
-                    })
-                    setTaskItems(prevList => [
-                        ...prevList.slice(0, index),
-                        ...prevList.slice(index + 1)
-                    ]);
+
+                const response = await axios.patch(`http://localhost:8800/api/tasks/${task.task_id}/complete`, {
+                    task_name: task.task_name,
+                    description: task.description,
+                    post: post,
+                    image: imageURI,
+                    new_complete_by_date: newCompleteByDate ? new Date(newCompleteByDate).toISOString().slice(0, 19).replace('T', ' ') : 0,
+                    new_notifications: tempNotifIds,
+                });
+                if (response.data.success) {
+                    console.log(response.data.message);
                 }
-                if (imageURI) {
-                    batch.update(postRef, { image: imageURI });
-                }
-                await batch.commit();
+
+                await cancelNotifications(task.notifications);
+                
+                
+                // else { // if task does not repeat
+                //     batch.delete(taskRef);
+                //     batch.update(userProfileRef, { tasks: increment(-1) });
+                //     listIds.forEach((listId) => { // remove task from lists
+                //         listRef = doc(listsRef, listId);
+                //         batch.update(listRef, { taskIds: arrayRemove(docId) });
+                //     })
+                //     setTaskItems(prevList => [
+                //         ...prevList.slice(0, index),
+                //         ...prevList.slice(index + 1)
+                //     ]);
+                // }
 
             } catch (error) {
                 // add error if image fails
                 console.error('Error updating task completion: ', error);
+                console.log(error.response.data.message);
             }
         }
         else {
@@ -462,13 +453,7 @@ const TaskListScreen = (props) => {
                 return 0;
             }
         }
-        return {
-            day: currDueDate.getDate(),
-            month: currDueDate.getMonth() + 1,
-            year: currDueDate.getFullYear(),
-            timestamp: currDueDate,
-            dateString: currDueDate.toISOString().split('T')[0],
-        };
+        return currDueDate;
     }
 
     //diffentiate delete post and task and make batch
@@ -921,7 +906,7 @@ const TaskListScreen = (props) => {
                                                     isFirst={isFirst}
                                                     isLast={isLast}
                                                     isSelected={index === editIndex}
-                                                    hidden={false}
+                                                    posted={task.posted}
                                                     info={infoHelper(task)}
                                                 />
                                             </TouchableOpacity>
@@ -938,7 +923,7 @@ const TaskListScreen = (props) => {
                                         return (
                                             <TouchableOpacity onPress={() => Platform.OS === 'ios' ? handleCompletedTaskPress(index) : {}} key={index} style={[styles.taskContainer, isFirst && styles.firstTask, isLast && styles.lastTask]}>
                                                 <Task
-                                                    text={task.postName}
+                                                    text={task.task_name}
                                                     tick={uncompleteTaskHelper}
                                                     i={index}
                                                     complete={true}
@@ -948,7 +933,7 @@ const TaskListScreen = (props) => {
                                                     isFirst={isFirst}
                                                     isLast={isLast}
                                                     isSelected={index === completedTaskIndex}
-                                                    hidden={task.hidden}
+                                                    posted={task.posted}
                                                     info={null}
                                                 />
                                             </TouchableOpacity>

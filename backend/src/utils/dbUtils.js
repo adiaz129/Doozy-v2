@@ -1,17 +1,17 @@
 import { pool } from '../config/db.js';
 
 const usersQuery = `CREATE TABLE IF NOT EXISTS users (
-  user_id INT PRIMARY KEY AUTO_INCREMENT,
-  name VARCHAR(100) NOT NULL,
-  email VARCHAR(254) NOT NULL UNIQUE,
-  password VARCHAR(128) NOT NULL,
-  username VARCHAR(30) NOT NULL UNIQUE,
-  username_lower VARCHAR(30) NOT NULL UNIQUE,
-  bio VARCHAR(150) DEFAULT NULL,
-  profile_pic VARCHAR(255),
-  post_count INT NOT NULL DEFAULT 0,
-  task_count INT NOT NULL DEFAULT 0,
-  friend_count INT NOT NULL DEFAULT 0
+    user_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(254) NOT NULL UNIQUE,
+    password VARCHAR(128) NOT NULL,
+    username VARCHAR(30) NOT NULL UNIQUE,
+    username_lower VARCHAR(30) NOT NULL UNIQUE,
+    bio VARCHAR(150) DEFAULT NULL,
+    profile_pic VARCHAR(255),
+    post_count INT NOT NULL DEFAULT 0,
+    task_count INT NOT NULL DEFAULT 0,
+    friend_count INT NOT NULL DEFAULT 0
 );`;
 
 const tasksQuery = `CREATE TABLE IF NOT EXISTS tasks (
@@ -26,6 +26,8 @@ const tasksQuery = `CREATE TABLE IF NOT EXISTS tasks (
     repeat_interval INT DEFAULT NULL,
     repeat_ends TIMESTAMP DEFAULT NULL,
     is_completed BOOLEAN DEFAULT FALSE,
+    time_task_completed TIMESTAMP DEFAULT NULL,
+    posted BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );`;
 
@@ -59,6 +61,17 @@ const notificationsQuery = `CREATE TABLE IF NOT EXISTS notifications (
     FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE
 );`;
 
+const postsQuery = `CREATE TABLE IF NOT EXISTS posts (
+    post_id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    post_name VARCHAR(100) NOT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    time_posted TIMESTAMP NOT NULL DEFAULT (UTC_TIMESTAMP()),
+    image VARCHAR(255) DEFAULT NULL,
+    like_count INT NOT NULL DEFAULT 0,
+    comment_count INT NOT NULL DEFAULT 0
+)`
+
 
 
 //make 
@@ -80,6 +93,7 @@ const createAllTables = async () => {
         await createTable('task_list', task_listQuery);
         await createTable('reminders', remindersQuery);
         await createTable('notifications', notificationsQuery);
+        await createTable('posts', postsQuery);
     } catch (error) {
         console.log("Error creating tables", error);
     }

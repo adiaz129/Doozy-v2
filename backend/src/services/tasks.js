@@ -1,5 +1,5 @@
 import { pool } from "../config/db.js";
-import { parseIdList } from "../utils/helperFunctions.js";
+import { parseIdList, parseStringIdList } from "../utils/helperFunctions.js";
 
 export const postTaskToDB = async (task, userId) => {
     const connection = await pool.getConnection();
@@ -9,9 +9,9 @@ export const postTaskToDB = async (task, userId) => {
         const values1 = [userId, task.task_name, task.description, task.complete_by_date, task.is_completion_time, task.priority, task.repeat_interval, task.repeat_ends, task.is_completed];
         const [result1] = await connection.query(q1, values1);
 
-        if (Array.isArray(task.selectedLists) && task.selectedLists.length > 0) {
+        if (Array.isArray(task.lists) && task.lists.length > 0) {
             const q2 = "INSERT INTO task_list (list_id, task_id) VALUES ?";
-            const values2 = task.selectedLists.map(listId => [listId, result1.insertId]);
+            const values2 = task.lists.map(listId => [listId, result1.insertId]);
             await connection.query(q2, [values2]);
         }
 
@@ -50,12 +50,12 @@ export const getAllTasksFromDB = async (userId) => {
             t.repeat_interval, 
             t.repeat_ends, 
             t.is_completed, 
-            GROUP_CONCAT(DISTINCT l.list_id) AS lists,
+            t.posted,
+            GROUP_CONCAT(DISTINCT tl.list_id) AS lists,
             GROUP_CONCAT(DISTINCT r.reminder_id) AS reminders,
             GROUP_CONCAT(DISTINCT n.notification_id) AS notifications
             FROM tasks t
             LEFT JOIN task_list tl ON t.task_id = tl.task_id
-            LEFT JOIN lists l ON tl.list_id = l.list_id
             LEFT JOIN reminders r ON t.task_id = r.task_id
             LEFT JOIN notifications n ON t.task_id = n.task_id
             WHERE t.user_id = (?)
@@ -66,9 +66,10 @@ export const getAllTasksFromDB = async (userId) => {
             ...task,
             is_completed: !!task.is_completed,
             is_completion_time: !!task.is_completion_time,
+            posted: !!task.posted,
             lists: parseIdList(task.lists),
             reminders: parseIdList(task.reminders),
-            notifications: parseIdList(task.notifications),
+            notifications: parseStringIdList(task.notifications),
         }))
 
         return {success: true, message: 'Get all tasks request successful', data: parsedResult};
@@ -90,14 +91,14 @@ export const getTasksByListIdFromDB = async (listId, userId) => {
             t.repeat_interval, 
             t.repeat_ends, 
             t.is_completed, 
-            GROUP_CONCAT(DISTINCT l.list_id) AS lists,
+            t.posted,
+            GROUP_CONCAT(DISTINCT tl.list_id) AS lists,
             GROUP_CONCAT(DISTINCT r.reminder_id) AS reminders,
             GROUP_CONCAT(DISTINCT n.notification_id) AS notifications
             FROM tasks t
             JOIN task_list tl_filter ON t.task_id = tl_filter.task_id
             JOIN lists l_filter ON tl_filter.list_id = l_filter.list_id AND l_filter.list_id = (?)
             LEFT JOIN task_list tl ON t.task_id = tl.task_id
-            LEFT JOIN lists l ON tl.list_id = l.list_id
             LEFT JOIN reminders r ON t.task_id = r.task_id
             LEFT JOIN notifications n ON t.task_id = n.task_id
             WHERE t.user_id = (?)
@@ -108,9 +109,10 @@ export const getTasksByListIdFromDB = async (listId, userId) => {
             ...task,
             is_completed: !!task.is_completed,
             is_completion_time: !!task.is_completion_time,
+            posted: !!task.posted,
             lists: parseIdList(task.lists),
             reminders: parseIdList(task.reminders),
-            notifications: parseIdList(task.notifications),
+            notifications: parseStringIdList(task.notifications),
         }))
 
         return {success: true, message: 'Get tasks by list id request successful', data: parsedResult};
@@ -131,12 +133,12 @@ export const getTaskByIdFromDB = async (taskId, userId) => {
             t.repeat_interval, 
             t.repeat_ends, 
             t.is_completed, 
-            GROUP_CONCAT(DISTINCT l.list_id) AS lists,
+            t.posted,
+            GROUP_CONCAT(DISTINCT tl.list_id) AS lists,
             GROUP_CONCAT(DISTINCT reminder_id) AS reminders,
             GROUP_CONCAT(DISTINCT notification_id) AS notifications
             FROM tasks t
             LEFT JOIN task_list tl ON t.task_id = tl.task_id
-            LEFT JOIN lists l ON tl.list_id = l.list_id
             LEFT JOIN reminders r ON t.task_id = r.task_id
             LEFT JOIN notifications n ON t.task_id = n.task_id
             WHERE t.task_id = (?) AND t.user_id = (?)
@@ -148,13 +150,92 @@ export const getTaskByIdFromDB = async (taskId, userId) => {
             ...task,
             is_completed: !!task.is_completed,
             is_completion_time: !!task.is_completion_time,
+            posted: !!task.posted,
             lists: parseIdList(task.lists),
             reminders: parseIdList(task.reminders),
-            notifications: parseIdList(task.notifications),
+            notifications: parseStringIdList(task.notifications),
         }))
 
         return {success: true, message: 'Get task by id successful', data: parsedResult};
     } catch (error) {
         return {success: false, message: 'Failed to get task by id'};
+    }
+}
+
+export const completeTaskInDB = async (taskId, userId, task) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const q1 = `UPDATE tasks SET is_completed = ?, time_task_completed = UTC_TIMESTAMP(), posted = ? WHERE task_id = ? AND user_id = ?;`;
+        const values1 = [true, task.post, taskId, userId];
+        await connection.query(q1, values1);
+        await connection.query(`DELETE FROM notifications WHERE task_id = ?`, [taskId]);
+
+        if (task.post) {
+            const q2 = `INSERT INTO posts (user_id, post_name, description, image) VALUES (?, ?, ?, ?);`;
+            const values2 = [userId, task.task_name, task.description, task.image];
+            await connection.query(q2, values2);
+        }
+
+        if (task.new_complete_by_date) {
+            const q3 = `SELECT t.task_id, 
+                t.task_name, 
+                t.description, 
+                t.time_task_created,
+                t.is_completion_time, 
+                t.priority, 
+                t.repeat_interval, 
+                t.repeat_ends, 
+                t.is_completed, 
+                GROUP_CONCAT(DISTINCT tl.list_id) AS lists,
+                GROUP_CONCAT(DISTINCT reminder_id) AS reminders
+                FROM tasks t
+                LEFT JOIN task_list tl ON t.task_id = tl.task_id
+                LEFT JOIN reminders r ON t.task_id = r.task_id
+                WHERE t.task_id = (?) AND t.user_id = (?)
+                GROUP BY t.task_id;`;
+            const values3 = [taskId, userId];
+            const [result3] = await connection.query(q3, values3);
+            const originalTaskRow = result3[0];
+
+            const originalTask = {
+                ...originalTaskRow,
+                is_completed: !!originalTaskRow.is_completed,
+                is_completion_time: !!originalTaskRow.is_completion_time,
+                lists: parseIdList(originalTaskRow.lists),
+                reminders: parseIdList(originalTaskRow.reminders),
+            };
+
+            const q4 = "INSERT INTO tasks (user_id, task_name, description, complete_by_date, is_completion_time, priority, repeat_interval, repeat_ends, is_completed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            const values4 = [userId, task.task_name, task.description, task.new_complete_by_date, originalTask.is_completion_time, originalTask.priority, originalTask.repeat_interval, originalTask.repeat_ends, false];
+            const [newTask] = await connection.query(q4, values4);
+
+            if (Array.isArray(originalTask.lists) && originalTask.lists.length > 0) {
+                const q5 = "INSERT INTO task_list (list_id, task_id) VALUES ?";
+                const values5 = originalTask.lists.map(listId => [listId, newTask.insertId]);
+                await connection.query(q5, [values5]);
+            }
+
+            if (Array.isArray(originalTask.reminders) && originalTask.reminders.length > 0) {
+                const q6 = "INSERT INTO reminders (reminder_id, task_id) VALUES ?";
+                const values6 = originalTask.reminders.map(reminderId => [reminderId, newTask.insertId]);
+                await connection.query(q6, [values6]);
+            }
+
+            if (Array.isArray(task.new_notifications) && task.new_notifications.length > 0) {
+                const q7 = "INSERT INTO notifications (notification_id, task_id) VALUES ?";
+                const values7 = task.new_notifications.map(notificationId => [notificationId, newTask.insertId]);
+                await connection.query(q7, [values7]);
+            }
+        }
+        await connection.commit();
+        return { success: true, message: "Task completed successfully." };
+    } catch (error) {
+        console.log(error);
+        await connection.rollback();
+        return { success: false, message: 'Task completion failed.' };
+    } finally {
+        connection.release();
     }
 }

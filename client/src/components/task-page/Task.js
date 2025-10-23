@@ -12,8 +12,7 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 
 const Task = (props) => {
 
-    const { text, tick, i, complete, deleteItem, onOpen, onClose, isFirst, isLast, isSelected, hidden, info} = props;
-
+    const { text, tick, i, complete, deleteItem, onOpen, onClose, isFirst, isLast, isSelected, posted, info} = props;
     const [isOpened, setIsOpened] = useState(false);
     const rowRef = useRef(null);
 
@@ -94,7 +93,7 @@ const Task = (props) => {
                 <View style={styles.noInfo}>
                     <TouchableOpacity style={styles.checkedbox} key={i} onPress={checkoff}>
                         {complete ? (
-                            hidden ? (
+                            !posted ? (
                             <CheckedTask width={32} height={32} />
                             ) : (
                             <CheckedPost width={32} height={32} />

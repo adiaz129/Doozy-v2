@@ -10,3 +10,8 @@ export const parseIdList = (str) => {
     if (!str) return [];
     return str.split(',').map(id => Number(id));
 };
+
+export const parseStringIdList = (str) => {
+    if (!str) return [];
+    return str.split(',').map(id => String(id));
+};
