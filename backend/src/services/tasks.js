@@ -239,3 +239,19 @@ export const completeTaskInDB = async (taskId, userId, task) => {
         connection.release();
     }
 }
+
+export const deleteTaskInDB = async (taskId, userId) => {
+    try {
+        const q = `DELETE FROM tasks WHERE task_id = ? AND user_id = ?;`;
+        const values = [taskId, userId];
+        const [result] = await pool.query(q, values);
+        if (result.affectedRows === 0) {
+            console.log("No rows deleted — invalid taskId/userId or task doesn't exist.");
+            return { success: false, message: "Task not found or already deleted." };
+        }
+
+        return { success: true, message: 'Task deleted successfully.' };
+    } catch (error) {
+        return { success: false, message: 'Task deletion failed' };
+    }
+}

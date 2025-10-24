@@ -311,9 +311,8 @@ const TaskListScreen = (props) => {
                 });
                 if (response.data.success) {
                     console.log(response.data.message);
+                    await cancelNotifications(task.notifications);
                 }
-
-                await cancelNotifications(task.notifications);
                 
                 
                 // else { // if task does not repeat
@@ -458,69 +457,16 @@ const TaskListScreen = (props) => {
 
     //diffentiate delete post and task and make batch
     const deleteItem = async (index, complete) => {
-        let docId;
-        let image;
-        if (!complete) {
-            docId = taskItems[index].id;
-        }
-        else {
-            docId = completedTaskItems[index].id;
-            image = completedTaskItems[index].image;
-        }
-        const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-        const listsRef = collection(userProfileRef, 'Lists');
+        let taskId = complete ? completedTaskItems[index].task_id : taskItems[index].task_id
+        
         try {
-            const batch = writeBatch(FIRESTORE_DB);
-            if (complete) {
-                let listRef;
-                const postRef = doc(FIRESTORE_DB, 'Posts', docId);
-                const likesRef = collection(postRef, 'Likes');
-                const commentsRef = collection(postRef, 'Comments');
-                completedTaskItems[index].listIds.forEach((listId) => {
-                    listRef = doc(listsRef, listId);
-                    batch.update(listRef, { postIds: arrayRemove(docId) })
-                });
-                const likesSnap = await getDocs(likesRef);
-                likesSnap.forEach(likeDoc => {
-                    const userLikeRef = doc(FIRESTORE_DB, 'Users', likeDoc.id, 'LikedPosts', docId);
-                    batch.delete(userLikeRef);
-                    batch.delete(likeDoc.ref);
-                });
-
-                const commentsSnap = await getDocs(commentsRef);
-                commentsSnap.forEach(commentDoc => {
-                    batch.delete(commentDoc.ref);
-                });
-                batch.delete(postRef);
-                if (image) {
-                    const imageRef = ref(getStorage(), image);
-                    await deleteObject(imageRef);
-                }
-                batch.update(userProfileRef, { posts: increment(-1) });
-                setCompletedTaskItems(prevList => [
-                    ...prevList.slice(0, index),
-                    ...prevList.slice(index + 1)
-                ]);
+            const response = await axios.delete(`http://localhost:8800/api/tasks/${taskId}`);
+            if (response.data.success) {
+                console.log(response.data.message)
+                await cancelNotifications(taskItems[index].notifications);
             }
-            else {
-                let listRef;
-                const tasksRef = collection(userProfileRef, 'Tasks');
-                const taskRef = doc(tasksRef, docId);
-                taskItems[index].listIds.forEach((listId) => {
-                    listRef = doc(listsRef, listId);
-                    batch.update(listRef, { taskIds: arrayRemove(docId) })
-                });
-                batch.update(userProfileRef, { tasks: increment(-1) });
-                batch.delete(taskRef);
-                await cancelNotifications(taskItems[index].notificationIds);
-                setTaskItems(prevList => [
-                    ...prevList.slice(0, index),
-                    ...prevList.slice(index + 1)
-                ]);
-            }
-            await batch.commit();
         } catch (error) {
-            console.error('Error deleting document: ', error);
+            console.error('Error deleting document: ', error.response.data.message);
         };
 
     }
