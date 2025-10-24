@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Keyboard, TextInput, Dimensions, TouchableWithoutFeedback, Animated, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { View, Text, StyleSheet, Keyboard, TextInput, Dimensions, TouchableWithoutFeedback, Animated, TouchableOpacity, ScrollView, Modal, Platform } from 'react-native';
 import ScheduleMenu from './ScheduleMenu';
 import ListModal from './PopUpMenus/ListModal';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,7 @@ import colors from '../../theme/colors';
 import fonts from '../../theme/fonts';
 import UncheckedTask from '../../assets/unchecked-task.svg';
 import CheckedTask from '../../assets/checked-task.svg';
+import axios from 'axios';
 
 const EditTask = (props) => {
     const { task, setTaskItems, index, listItems, toggleEditTaskVisible, configureNotifications, scheduleNotifications, cancelNotifications, isRepeatingTask, deleteItem } = props;
@@ -84,135 +85,102 @@ const EditTask = (props) => {
             textTaskInputRef.current.focus();
             return;
         }
-        const batch = writeBatch(FIRESTORE_DB);
-        const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-        const tasksRef = collection(userProfileRef, 'Tasks');
-        const postsRef = collection(FIRESTORE_DB, 'Posts');
-        const taskRef = doc(tasksRef, task.id);
+        setSaveChangesModalVisible(false);
         try {
+            let tempNotifIds = [];
+            let response;
             if (!isComplete) {
-                batch.update(taskRef, {
-                    taskName: editedTaskName,
-                    description: editedDescription,
-                    completeByDate: selectedDate,
-                    isCompletionTime: isTime,
-                    priority: selectedPriority,
-                    reminders: selectedReminders,
-                    repeat: selectedRepeat,
-                    repeatEnds: dateRepeatEnds,
-                    listIds: selectedLists,
-                });
-                // see which listIds were removed and go into each list and remove the taskid from the lists
-                // see which listIds were added and go into each list and add the taskid to the lists
-                const listsToRemoveFrom = task.listIds.filter(item => !selectedLists.includes(item));
-                const liststoAddTo = selectedLists.filter(item => !task.listIds.includes(item));
-                let listRef;
-                listsToRemoveFrom.forEach((list) => {
-                    listRef = doc(userProfileRef, 'Lists', list);
-                    batch.update(listRef, { taskIds: arrayRemove(task.id) });
-                });
-                liststoAddTo.forEach((list) => {
-                    listRef = doc(userProfileRef, 'Lists', list);
-                    batch.update(listRef, { taskIds: arrayUnion(task.id) });
-                })
-                await cancelNotifications(task.notificationIds);
-
                 if (selectedReminders.length !== 0) {
                     if (await configureNotifications()) {
-                        const tempNotifIds = await scheduleNotifications(selectedReminders, selectedDate, isTime, editedTaskName);
-                        batch.update(taskRef, { notificationIds: tempNotifIds });
+                        tempNotifIds = await scheduleNotifications(selectedReminders, selectedDate, isTime, editedTaskName);
                     }
                 }
-                setSaveChangesModalVisible(false);
+                response = await axios.patch(`http://localhost:8800/api/tasks/${task.task_id}`, {
+                    task_name: editedTaskName,
+                    description: editedDescription,
+                    complete_by_date: selectedDate ? new Date(selectedDate).toISOString().slice(0, 19).replace('T', ' ') : null,
+                    is_completion_time: isTime,
+                    priority: selectedPriority,
+                    reminders: selectedReminders,
+                    repeat_interval: selectedRepeat,
+                    repeat_ends: dateRepeatEnds ? new Date(dateRepeatEnds).toISOString().slice(0, 19).replace('T', ' ') : null,
+                    lists: selectedLists,
+                    notifications: tempNotifIds,
+                    is_completed: false,
+                });
             }
             else {
                 setSaveChangesModalVisible(false);
-                const postRef = doc(postsRef);
-                batch.set(postRef, {
-                    userId: currentUser.uid,
-                    postName: editedTaskName,
-                    description: editedDescription,
-                    timePosted: new Date(),
-                    timeTaskCreated: task.timeTaskCreated,
-                    completeByDate: selectedDate,
-                    isCompletionTime: isTime,
-                    priority: selectedPriority,
-                    reminders: selectedReminders,
-                    listIds: selectedLists,
-                    hidden: false,
-                    likeCount: 0,
-                    commentCount: 0,
-                })
-                // remove task id from every list in original array
-                // add post id to every list in new array
-                let listRef;
-
-                selectedLists.forEach((list) => {
-                    listRef = doc(userProfileRef, 'Lists', list);
-                    batch.update(listRef, { postIds: arrayUnion(postRef.id) });
-                })
 
                 let imageURI;
-                while (true) {
-                    const cameraOption = await openCameraOptionMenu();
-                    if (cameraOption == 'cancel') {
-                        setCameraOptionModalVisible(false);
-                        return;
-                    }
-                    else if (cameraOption == 'library') {
-                        imageURI = await addImage();
-                        if (imageURI) {
-                            break;
-                        }
-                    }
-                    else if (cameraOption == 'camera') {
-                        imageURI = await takePhoto();
-                        if (imageURI) {
-                            break;
-                        }
-                    }
-                    else if (cameraOption == 'no post') {
-                        imageURI = null;
-                        batch.update(postRef, {hidden: true});
-                        break;
-                    }
-                    else {
-                        imageURI = null;
-                        break;
-                    }
-                }
-                setCameraOptionModalVisible(false);
-
-                await cancelNotifications(task.notificationIds);
-                const taskRef = doc(tasksRef, task.id);
-
-                let newCompleteByDate;
-                if (selectedDate && (newCompleteByDate = isRepeatingTask(selectedDate.timestamp, dateRepeatEnds, selectedRepeat))) {
-                    batch.update(taskRef, { completeByDate: newCompleteByDate });
-                    if (selectedReminders.length !== 0) {
-                        if (await configureNotifications()) {
-                            const tempNotifIds = await scheduleNotifications(selectedReminders, newCompleteByDate, isTime, editedTaskName);
-                            batch.update(taskRef, { notificationIds: tempNotifIds });
-                        }
-                    }
+                let post = true;
+                if (Platform.OS === 'android') { //TEMPORARY FIX
+                    imageURI = await addImage();
                 }
                 else {
-                    batch.delete(taskRef);
-                    batch.update(userProfileRef, { tasks: increment(-1) });
-                    task.listIds.forEach((list) => {
-                        listRef = doc(userProfileRef, 'Lists', list);
-                        batch.update(listRef, { taskIds: arrayRemove(task.id) });
-                    })
-                    setTaskItems(prevList => [
-                        ...prevList.slice(0, index),
-                        ...prevList.slice(index + 1)
-                    ]);
+                    while (true) {
+                        const cameraOption = await openCameraOptionMenu();
+                        if (cameraOption == 'cancel') {
+                            setCameraOptionModalVisible(false);
+                            return;
+                        }
+                        else if (cameraOption == 'library') {
+                            imageURI = await addImage();
+                            if (imageURI) {
+                                break;
+                            }
+                        }
+                        else if (cameraOption == 'camera') {
+                            imageURI = await takePhoto();
+                            if (imageURI) {
+                                break;
+                            }
+                        }
+                        else if (cameraOption == 'no post') {
+                            imageURI = null;
+                            post = false;
+                            break;
+                        }
+                        else {
+                            imageURI = null;
+                            break;
+                        }
+                    }
+                    setCameraOptionModalVisible(false);
                 }
 
-                batch.update(postRef, { image: imageURI });
-                batch.update(userProfileRef, { posts: increment(1) });
+                let newCompleteByDate;
+                let tempNotifIds = [];
+                if (selectedDate && (newCompleteByDate = isRepeatingTask(selectedDate, dateRepeatEnds, selectedRepeat))) {// check if task repeats and return next possible date
+                    if (selectedReminders.length !== 0) { // schedule notifications
+                        if (await configureNotifications()) {
+                            tempNotifIds = await scheduleNotifications(selectedReminders, newCompleteByDate, isTime, editedTaskName);
+                        }
+                    }
+                }
+
+                response = await axios.patch(`http://localhost:8800/api/tasks/${task.task_id}`, {
+                    completing: true,
+                    task_name: editedTaskName,
+                    description: editedDescription,
+                    complete_by_date: selectedDate ? new Date(selectedDate).toISOString().slice(0, 19).replace('T', ' ') : null,
+                    is_completion_time: isTime,
+                    priority: selectedPriority,
+                    reminders: selectedReminders,
+                    repeat_interval: selectedRepeat,
+                    repeat_ends: dateRepeatEnds ? new Date(dateRepeatEnds).toISOString().slice(0, 19).replace('T', ' ') : null,
+                    lists: selectedLists,
+                    post: post,
+                    image: imageURI,
+                    new_complete_by_date: newCompleteByDate ? new Date(newCompleteByDate).toISOString().slice(0, 19).replace('T', ' ') : 0,
+                    new_notifications: tempNotifIds,
+                    is_completed: true,
+                });
             }
-            await batch.commit();
+            if (response.data.success) {
+                console.log(response.data.message);
+                await cancelNotifications(task.notifications);
+            }
             setTimeout(() => {
                 toggleEditTaskVisible()
             }, 100);

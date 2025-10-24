@@ -78,23 +78,14 @@ const TaskCreation = (props) => {
                     notifications = await scheduleNotifications(reminders, complete_by_date, is_completion_time, task_name);
                 }
             }
-            let mysqlTimestampCompleteBy;
-            let mysqlTimestampRepeatEnds;
-
-            if (complete_by_date) {
-                mysqlTimestampCompleteBy = new Date(complete_by_date).toISOString().slice(0, 19).replace('T', ' ');
-            }
-            if (repeat_ends) {
-                mysqlTimestampRepeatEnds = new Date(repeat_ends).toISOString().slice(0, 19).replace('T', ' ');
-            }
             const response = await axios.post('http://localhost:8800/api/tasks', {
                     task_name, 
                     description, 
-                    complete_by_date: complete_by_date ? mysqlTimestampCompleteBy : null, 
+                    complete_by_date: complete_by_date ? new Date(complete_by_date).toISOString().slice(0, 19).replace('T', ' ') : null, 
                     is_completion_time, 
                     priority, 
                     repeat_interval, 
-                    repeat_ends: repeat_ends ? mysqlTimestampRepeatEnds : null, 
+                    repeat_ends: repeat_ends ? new Date(repeat_ends).toISOString().slice(0, 19).replace('T', ' ') : null, 
                     is_completed, 
                     post, 
                     lists: selectedLists, 

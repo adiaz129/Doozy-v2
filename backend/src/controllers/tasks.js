@@ -1,4 +1,4 @@
-import { postTaskToDB, getAllTasksFromDB, getTasksByListIdFromDB, getTaskByIdFromDB, completeTaskInDB, deleteTaskInDB } from '../services/tasks.js';
+import { postTaskToDB, getAllTasksFromDB, getTasksByListIdFromDB, getTaskByIdFromDB, updateTaskInDB, deleteTaskInDB } from '../services/tasks.js';
 
 export const postTask = async (req, res) => {
     try {
@@ -58,14 +58,13 @@ export const getTaskById = async (req, res) => {
     }
 }
 
-export const completeTask = async (req, res) => {
+export const updateTask = async (req, res) => {
     try {
         const taskId = Number(req.params.task_id);
-        console.log(taskId)
         const userId = req.user.uid;
         const task = req.body;
 
-        const response = await completeTaskInDB(taskId, userId, task);
+        const response = await updateTaskInDB(taskId, userId, task);
         if (response.success) {
             return res.status(200).json(response);
         }

@@ -1,6 +1,7 @@
 import { pool } from "../config/db.js";
 import { parseIdList, parseStringIdList } from "../utils/helperFunctions.js";
 
+// update this to include posting and repeated tasks
 export const postTaskToDB = async (task, userId) => {
     const connection = await pool.getConnection();
     try {
@@ -162,15 +163,101 @@ export const getTaskByIdFromDB = async (taskId, userId) => {
     }
 }
 
-export const completeTaskInDB = async (taskId, userId, task) => {
+/*
+i should just make this the patch
+there are 3 states:
+- in the process of completing a task 
+   - with a repeating task created
+   - with a post being created
+   - with neither
+   - with both
+- in the process of uncompleting a task
+   - set repeat_interval and repeat_ends to null
+- neither completing nor uncompleting just editing
+
+Structure:
+- have a post flag and uncompleting flag
+- in all three i should update the allowed fields (list them) in the req.body
+- however i should override some updates
+    - if i am uncompleting a task, always set repeat_interval and repeat_ends to null no matter whats in the req.body
+- next check if post is true if so then post with task_name and description
+- next check if there is a new_complete_by_date if so get from database and post with slightly different data
+*/
+
+export const updateTaskInDB = async (taskId, userId, task) => {
+    console.log(task.task_name);
+    const allowedFields = [
+        "task_name", 
+        "description", 
+        "complete_by_date",
+        "is_completion_time", 
+        "priority", 
+        "repeat_interval", 
+        "repeat_ends",
+        "is_completed"
+    ]
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
 
-        const q1 = `UPDATE tasks SET is_completed = ?, time_task_completed = UTC_TIMESTAMP(), posted = ? WHERE task_id = ? AND user_id = ?;`;
-        const values1 = [true, task.post, taskId, userId];
-        await connection.query(q1, values1);
-        await connection.query(`DELETE FROM notifications WHERE task_id = ?`, [taskId]);
+        const setClauses = [];
+        const values1 = [];
+
+        for (const key in task) {
+            if (allowedFields.includes(key)) {
+                setClauses.push(`${key} = ?`);
+                if (task.uncompleting && (key === "repeat_interval" || key === "repeat_ends")) {
+                    continue;
+                }
+                values1.push(task[key]);
+            }
+        }
+
+        if (task.completing) {
+            setClauses.push(`time_task_completed = UTC_TIMESTAMP()`);
+        }
+        if (task.uncompleting) {
+            setClauses.push(`time_task_completed = null`, `repeat_interval = null`, `repeat_ends = null`)
+        }
+
+        if (setClauses.length === 0) {
+            return { success: false, message: "No valid fields to update" };
+        }
+
+        const q1 = `UPDATE tasks 
+            SET ${setClauses.join(", ")} 
+            WHERE task_id = ? AND user_id = ?;`;
+        values1.push(taskId, userId);
+        const [result1] = await connection.query(q1, values1);
+
+        if (result1.affectedRows === 0) {
+            throw new Error("Task not found or unauthorized");
+        }
+
+        if (task.completing) {
+            await connection.query(`DELETE FROM notifications WHERE task_id = ?`, [taskId]);
+        }
+
+        if (Array.isArray(task.lists) && task.lists.length > 0) {
+            await connection.query(`DELETE FROM task_list WHERE task_id = ?`, [taskId]);
+            const q2 = "INSERT INTO task_list (list_id, task_id) VALUES ?";
+            const values2 = task.lists.map(listId => [listId, taskId]);
+            await connection.query(q2, [values2]);
+        }
+
+        if (Array.isArray(task.reminders) && task.reminders.length > 0) {
+            await connection.query(`DELETE FROM reminders WHERE task_id = ?`, [taskId]);
+            const q3 = "INSERT INTO reminders (reminder_id, task_id) VALUES ?";
+            const values3 = task.reminders.map(reminderId => [reminderId, taskId]);
+            await connection.query(q3, [values3]);
+        }
+
+        if (Array.isArray(task.notifications) && task.notifications.length > 0) {
+            await connection.query(`DELETE FROM notifications WHERE task_id = ?`, [taskId]);
+            const q4 = "INSERT INTO notifications (notification_id, task_id) VALUES ?";
+            const values4 = task.notifications.map(notificationId => [notificationId, taskId]);
+            await connection.query(q4, [values4]);
+        }
 
         if (task.post) {
             const q2 = `INSERT INTO posts (user_id, post_name, description, image) VALUES (?, ?, ?, ?);`;
@@ -178,7 +265,7 @@ export const completeTaskInDB = async (taskId, userId, task) => {
             await connection.query(q2, values2);
         }
 
-        if (task.new_complete_by_date) {
+        if (task.completing && task.new_complete_by_date) {
             const q3 = `SELECT t.task_id, 
                 t.task_name, 
                 t.description, 
@@ -230,11 +317,11 @@ export const completeTaskInDB = async (taskId, userId, task) => {
             }
         }
         await connection.commit();
-        return { success: true, message: "Task completed successfully." };
+        return { success: true, message: "Task updated successfully." };
     } catch (error) {
         console.log(error);
         await connection.rollback();
-        return { success: false, message: 'Task completion failed.' };
+        return { success: false, message: 'Task update failed.' };
     } finally {
         connection.release();
     }

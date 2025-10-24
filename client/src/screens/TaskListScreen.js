@@ -296,14 +296,16 @@ const TaskListScreen = (props) => {
                 if (task.complete_by_date && (newCompleteByDate = isRepeatingTask(task.complete_by_date, task.repeat_ends, task.repeat_interval))) {// check if task repeats and return next possible date
                     if (task.reminders.length !== 0) { // schedule notifications
                         if (await configureNotifications()) {
-                            tempNotifIds = await scheduleNotifications(task.reminders, newCompleteByDate, task.is_co, task.task_name);
+                            tempNotifIds = await scheduleNotifications(task.reminders, newCompleteByDate, task.is_completion_time, task.task_name);
                         }
                     }
                 }
 
-                const response = await axios.patch(`http://localhost:8800/api/tasks/${task.task_id}/complete`, {
+                const response = await axios.patch(`http://localhost:8800/api/tasks/${task.task_id}`, {
+                    completing: true,
                     task_name: task.task_name,
                     description: task.description,
+                    is_completed: true,
                     post: post,
                     image: imageURI,
                     new_complete_by_date: newCompleteByDate ? new Date(newCompleteByDate).toISOString().slice(0, 19).replace('T', ' ') : 0,
@@ -335,64 +337,74 @@ const TaskListScreen = (props) => {
             }
         }
         else {
-            const batch = writeBatch(FIRESTORE_DB);
-            const post = completedTaskItems[index];
-            const docId = post.id;
-            const listIds = post.listIds;
+            const task = completedTaskItems[index];
             try {
-                const postRef = doc(postsRef, docId);
-                const taskRef = doc(tasksRef);
-                batch.set(taskRef, {
-                    taskName: post.postName,
-                    description: post.description,
-                    priority: post.priority,
-                    reminders: post.reminders,
-                    completeByDate: post.completeByDate,
-                    isCompletionTime: post.isCompletionTime,
-                    listIds: post.listIds,
-                    timeTaskCreated: post.timeTaskCreated,
-                    notificationIds: [],
-                    repeat: null,
-                    repeatEnds: null,
-                });
-                let listRef;
-                listIds.forEach((listId) => {
-                    listRef = doc(listsRef, listId);
-                    batch.update(listRef, { postIds: arrayRemove(docId) });
-                    batch.update(listRef, { taskIds: arrayUnion(taskRef.id) })
-                })
-                const likesRef = collection(postRef, 'Likes');
-                const commentsRef = collection(postRef, 'Comments');
-                const likesSnap = await getDocs(likesRef);
-                likesSnap.forEach(likeDoc => {
-                    const userLikeRef = doc(FIRESTORE_DB, 'Users', likeDoc.id, 'LikedPosts', docId);
-                    batch.delete(userLikeRef);
-                    batch.delete(likeDoc.ref);
-                });
-
-                const commentsSnap = await getDocs(commentsRef);
-                commentsSnap.forEach(commentDoc => {
-                    batch.delete(commentDoc.ref);
-                });
-                batch.delete(postRef);
-                batch.update(userProfileRef, { posts: increment(-1) });
-                batch.update(userProfileRef, { tasks: increment(1) });
-                if (post.reminders.length !== 0) {
+                let tempNotifIds = [];
+                if (task.reminders.length !== 0) {
                     if (await configureNotifications()) {
-                        const tempNotifIds = await scheduleNotifications(post.reminders, post.completeByDate, post.isCompletionTime, post.postName);
-                        batch.update(taskRef, { notificationIds: tempNotifIds });
+                        tempNotifIds = await scheduleNotifications(task.reminders, task.complete_by_date, task.is_completion_time, task.task_name);
                     }
                 }
-                const image = post.image;
-                if (image) {
-                    const imageRef = ref(getStorage(), image);
-                    await deleteObject(imageRef);
+                const response = await axios.patch(`http://localhost:8800/api/tasks/${task.task_id}`, {
+                    uncompleting: true,
+                    is_completed: false,
+                    notifications: tempNotifIds
+                });
+
+                if (response.data.success) {
+                    console.log(response.data.message);
                 }
-                setCompletedTaskItems(prevList => [
-                    ...prevList.slice(0, index),
-                    ...prevList.slice(index + 1)
-                ]);
-                await batch.commit();
+                // batch.set(taskRef, {
+                //     taskName: post.postName,
+                //     description: post.description,
+                //     priority: post.priority,
+                //     reminders: post.reminders,
+                //     completeByDate: post.completeByDate,
+                //     isCompletionTime: post.isCompletionTime,
+                //     listIds: post.listIds,
+                //     timeTaskCreated: post.timeTaskCreated,
+                //     notificationIds: [],
+                //     repeat: null,
+                //     repeatEnds: null,
+                // });
+                // let listRef;
+                // listIds.forEach((listId) => {
+                //     listRef = doc(listsRef, listId);
+                //     batch.update(listRef, { postIds: arrayRemove(docId) });
+                //     batch.update(listRef, { taskIds: arrayUnion(taskRef.id) })
+                // })
+                // const likesRef = collection(postRef, 'Likes');
+                // const commentsRef = collection(postRef, 'Comments');
+                // const likesSnap = await getDocs(likesRef);
+                // likesSnap.forEach(likeDoc => {
+                //     const userLikeRef = doc(FIRESTORE_DB, 'Users', likeDoc.id, 'LikedPosts', docId);
+                //     batch.delete(userLikeRef);
+                //     batch.delete(likeDoc.ref);
+                // });
+
+                // const commentsSnap = await getDocs(commentsRef);
+                // commentsSnap.forEach(commentDoc => {
+                //     batch.delete(commentDoc.ref);
+                // });
+                // batch.delete(postRef);
+                // batch.update(userProfileRef, { posts: increment(-1) });
+                // batch.update(userProfileRef, { tasks: increment(1) });
+                // if (post.reminders.length !== 0) {
+                //     if (await configureNotifications()) {
+                //         const tempNotifIds = await scheduleNotifications(post.reminders, post.completeByDate, post.isCompletionTime, post.postName);
+                //         batch.update(taskRef, { notificationIds: tempNotifIds });
+                //     }
+                // }
+                // const image = post.image;
+                // if (image) {
+                //     const imageRef = ref(getStorage(), image);
+                //     await deleteObject(imageRef);
+                // }
+                // setCompletedTaskItems(prevList => [
+                //     ...prevList.slice(0, index),
+                //     ...prevList.slice(index + 1)
+                // ]);
+                // await batch.commit();
 
             } catch (error) {
                 console.error('Error updating task completion: ', error);
@@ -642,16 +654,6 @@ const TaskListScreen = (props) => {
         await logout();
     }
 
-    const uncompleteTaskHelper = (index, complete) => {
-        if (!completedTaskItems[index].hidden && Platform.OS === 'ios') {
-            setCompletedTaskIndex(index);
-            setUncompleteTaskConfirmationVisible(true);
-        }
-        else {
-            completeTask(index, complete);
-        }
-    }
-
     const infoHelper = (task) => { //0: priority, 1: dueDate
         // if default show completeByDate -> priority -> nothing
         // if priority show priority only
@@ -870,7 +872,7 @@ const TaskListScreen = (props) => {
                                             <TouchableOpacity onPress={() => Platform.OS === 'ios' ? handleCompletedTaskPress(index) : {}} key={index} style={[styles.taskContainer, isFirst && styles.firstTask, isLast && styles.lastTask]}>
                                                 <Task
                                                     text={task.task_name}
-                                                    tick={uncompleteTaskHelper}
+                                                    tick={completeTask}
                                                     i={index}
                                                     complete={true}
                                                     deleteItem={deleteItem}
