@@ -19,7 +19,7 @@ export const getAllListsFromDB = async (userId) => {
         const values = [userId];
         const [result] = await pool.query(q, values);
         
-        return { success: true, message: 'Get all lists successful.', data: result };
+        return { success: true, message: 'Get all lists successful.', body: result };
     } catch (error) {
         console.error(error);
         return { success: false, message: 'Failure to get all lists.'}

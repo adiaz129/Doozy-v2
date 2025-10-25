@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Keyboard, TextInput, Dimensions, TouchableWithoutFeedback, Animated, TouchableOpacity, ScrollView, Modal } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import colors from '../../theme/colors';
 import fonts from '../../theme/fonts';
@@ -47,6 +47,7 @@ const ViewCompletedTask = (props) => {
 
 
     const getDateString = (timestamp) => {
+        console.log(timestamp)
         return timestamp.toLocaleDateString();
     }
 
@@ -59,18 +60,18 @@ const ViewCompletedTask = (props) => {
     }
 
     const uncompleteTaskHelper = (index, complete) => {
-        if (!task.hidden) {
-            setUncompleteTaskConfirmationVisible(true);
-        }
-        else {
-            toggleCompletedTaskVisible();
-            completeTask(index, complete);
-        }
+        // if (!task.hidden) {
+        //     setUncompleteTaskConfirmationVisible(true);
+        // }
+        // else {
+        toggleCompletedTaskVisible();
+        completeTask(index, complete);
+        // }
     }
 
     return (
         <View style={{ flex: 1 }}>
-            <Modal
+            {/* <Modal
                 visible={isUncompleteTaskConfirmationVisible}
                 transparent={true}
                 animationType='fade'
@@ -90,7 +91,7 @@ const ViewCompletedTask = (props) => {
                     confirmColor={colors.red}
                     denyColor={colors.primary}
                 />
-            </ Modal>
+            </ Modal> */}
             <Modal
                 visible={isDeleteTaskModalVisible}
                 transparent={true}
@@ -124,7 +125,10 @@ const ViewCompletedTask = (props) => {
                             <Ionicons name="chevron-down-outline" size={32} color={colors.primary} />
                         </TouchableOpacity>
                         {task && <View style={styles.listButton}>
-                            <Text numberOfLines={1} ellipsizeMode="tail" style={styles.listPicker}>{task.listIds.length === 0 ? "No Lists Selected" : listItems.find(item => item.id === task.listIds[0]).name + (task.listIds.length === 1 ? "" : ", ...")}</Text>
+                            <View style={{marginRight: 5}}>
+                                <FontAwesome5 name="list-ul" size={16} color={colors.primary} />
+                            </View>
+                            <Text numberOfLines={1} ellipsizeMode="tail" style={styles.listPicker}>{task.lists.length === 0 ? "No Lists Selected" : listItems.find(item => item.list_id === task.lists[0]).list_name + (task.lists.length === 1 ? "" : ", ...")}</Text>
                         </View>}
                         <View style={{ width: 50, alignItems: 'center' }} />
                     </View>
@@ -134,15 +138,8 @@ const ViewCompletedTask = (props) => {
                             <CheckedTask width={42} height={42} />
                         </TouchableOpacity>
                         {task && <View style={styles.dateContainer}>
-                            <Text style={styles.timePicker}>Due Date:</Text>
-                            {task.isCompletionTime ? (
-                                <Text style={styles.timePicker}>{getDateString(task.completeByDate.timestamp)}, {getTimeString(task.completeByDate.timestamp)}</Text>
-                            ) : task.completeByDate ? (
-                                <Text style={styles.timePicker}>{getDateString(task.completeByDate.timestamp)}</Text>
-                            ) : (
-                                <Text style={styles.timePicker}>No time set</Text>
-                            )
-                            }
+                            <Text style={styles.timePicker}>Completed:</Text>
+                            <Text style={[styles.timePickerTime, task.time_task_completed > task.complete_by_date ? {color: colors.red} : {color: colors.primary}]}>{getDateString(task.time_task_completed)}, {getTimeString(task.time_task_completed)}</Text>
                         </View>}
                         {task && <View style={{ marginLeft: 10, width: 24 }}>
                             <Icon
@@ -154,7 +151,7 @@ const ViewCompletedTask = (props) => {
                     </View>
                     <ScrollView style={{paddingHorizontal: 20}}>
                         {task && <View style={styles.taskNameContainer}>
-                            <Text style={styles.taskNameInput}>{task.postName}</Text>
+                            <Text style={styles.taskNameInput}>{task.task_name}</Text>
                         </View>}
                         {task && <View style={styles.descriptionContainer}>
                             <Text style={styles.descriptionInput}>{task.description}</Text>
@@ -250,6 +247,7 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontFamily: fonts.regular,
         color: colors.primary,
+        marginRight: 5
     },
     rowTwoView: {
         height: 40,
@@ -266,6 +264,10 @@ const styles = StyleSheet.create({
     timePicker: {
         textAlign: 'center',
         color: colors.primary,
+        fontFamily: fonts.regular,
+    },
+    timePickerTime: {
+        textAlign: 'center',
         fontFamily: fonts.regular,
     },
     taskNameContainer: {

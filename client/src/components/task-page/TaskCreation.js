@@ -18,7 +18,7 @@ import axios from 'axios';
 
 
 const TaskCreation = (props) => {
-    const { closeSwipeCard, listItems, selectedLists, setSelectedLists, nav, configureNotifications, scheduleNotifications, isRepeatingTask, cancelNotifications } = props;
+    const { closeSwipeCard, setAllTasks, listItems, selectedLists, setSelectedLists, nav, configureNotifications, scheduleNotifications, isRepeatingTask, cancelNotifications } = props;
 
     const textTaskInputRef = useRef(null);
 
@@ -94,11 +94,30 @@ const TaskCreation = (props) => {
                     image
                 });
             if (response.data.success) {
+                setAllTasks(prev => [...prev, {
+                    task_id: response.data.task_id, 
+                    task_name, 
+                    description, 
+                    complete_by_date: complete_by_date ? complete_by_date : null, 
+                    is_completion_time, 
+                    priority, 
+                    repeat_interval, 
+                    repeat_ends: repeat_ends ? repeat_ends : null, 
+                    is_completed, 
+                    lists: selectedLists, 
+                    reminders, 
+                    notifications, 
+                    time_task_created: new Date(),
+                    time_task_completed: null
+                }])
                 console.log(response.data.message);
+
             }
         } catch (error) { // add an error check for 401 and logout
             console.log(error.response.data.message);
             // await cancelNotifications(notifications);
+        } finally {
+            setTaskCreationModalVisible(false);
         }
     }
 
@@ -399,7 +418,7 @@ const TaskCreation = (props) => {
                             >
                                 <View style={styles.iconContainer}>
                                     {selectedLists.length === 0 ?
-                                        <FontAwesome5 name="list-ul" size={28} color={colors.primary} />
+                                        <FontAwesome5 name="list-alt" size={28} color={colors.primary} />
                                         :
                                         <FontAwesome5 name="list-alt" size={28} color={colors.accent} />
                                     }

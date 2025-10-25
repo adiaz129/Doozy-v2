@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
-import CheckedPost from '../../assets/checked-post-sent.svg';
 import CheckedTask from '../../assets/checked-task.svg'
 import UncheckedTask from '../../assets/unchecked-task.svg';
 import colors from '../../theme/colors';
@@ -12,7 +11,7 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 
 const Task = (props) => {
 
-    const { text, tick, i, complete, deleteItem, onOpen, onClose, isFirst, isLast, isSelected, posted, info} = props;
+    const { text, tick, i, complete, deleteItem, onOpen, onClose, isFirst, isLast, isSelected, info} = props;
     const [isOpened, setIsOpened] = useState(false);
     const rowRef = useRef(null);
 
@@ -93,11 +92,7 @@ const Task = (props) => {
                 <View style={styles.noInfo}>
                     <TouchableOpacity style={styles.checkedbox} key={i} onPress={checkoff}>
                         {complete ? (
-                            !posted ? (
                             <CheckedTask width={32} height={32} />
-                            ) : (
-                            <CheckedPost width={32} height={32} />
-                            )
                         ):(
                             <UncheckedTask width={32} height={32} />
                         )}

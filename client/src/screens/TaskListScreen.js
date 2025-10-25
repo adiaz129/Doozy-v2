@@ -30,6 +30,7 @@ const TaskListScreen = (props) => {
     const { logout } = useContext(AuthContext); //remove
     const [order, setOrder] = useState("default");
     const [listId, setListId] = useState(0);
+    const [allTasks, setAllTasks] = useState([]);
     const [taskItems, setTaskItems] = useState([]);
     const [completedTaskItems, setCompletedTaskItems] = useState([]);
     const [listItems, setListItems] = useState([]);
@@ -48,138 +49,64 @@ const TaskListScreen = (props) => {
     const [refreshing, setRefreshing] = useState(false);
     const unsubscribeRef = useRef();
     const sortRef = useRef(null);
-    const currentUser = FIREBASE_AUTH.currentUser;
 
     const [selectedLists, setSelectedLists] = useState([]);
 
     useEffect(() => {
-        fetchTasks();
         fetchLists();
-    }, [listId, refreshing]); // change so that theres a fetch on evry get, post, delete, update
+        fetchTasks();
+    }, [refreshing]);
 
     useEffect(() => {
-        sortTasks(taskItems);
-    }, [order, taskItems]);
+        console.log("organizing")
+        organizeTasks(allTasks);
+    }, [order, listId, allTasks]);
+
+    useEffect(() => {
+        updateListDetails(listItems);
+    }, [listId])
 
     const fetchTasks = async () => {
         try {
-            let response;
-            if (listId !== 0) {
-                response = await axios.get(`http://localhost:8800/api/tasks?listId=${listId}`);
-            }
-            else {
-                response = await axios.get(`http://localhost:8800/api/tasks`);
-            }
-            const fetchedTasks = response.data.data.map(task => ({
+            const response = await axios.get(`http://localhost:8800/api/tasks`);
+            const fetchedTasks = response.data.body.map(task => ({
                 ...task,
                 time_task_created: new Date(task.time_task_created),
                 complete_by_date: task.complete_by_date ? new Date(task.complete_by_date) : null,
                 repeat_ends: task.repeat_ends ? new Date(task.repeat_ends) : null,
+                time_task_completed: task.time_task_completed? new Date(task.time_task_completed) : null,
             }));
-            const fetchedIncompletedTasks = fetchedTasks.filter((task) => {
-                return !task.is_completed;
-            })
-            const fetchedCompletedTasks = fetchedTasks.filter((task) => {
-                return task.is_completed;
-            })
-            sortTasks(fetchedIncompletedTasks);
-            setCompletedTaskItems(fetchedCompletedTasks);
+            setAllTasks(fetchedTasks);
         } catch (error) {
             console.error("Error fetching tasks:",  error.response.data.message);
+        } finally {
+            setRefreshing(false);
         }
     }
-
-    const onRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => {
-        setRefreshing(false);
-    }, 500);
-  };
-
-    function fetchPosts() {
-        let unsubscribeList = () => { };
-        let unsubscribePosts = () => { };
-        let postIds = [];
-
-        const postsRef = collection(FIRESTORE_DB, 'Posts');
-        const q = query(postsRef, where("userId", "==", currentUser.uid), orderBy('timePosted', 'desc'));
-        const listRef = doc(FIRESTORE_DB, 'Users', currentUser.uid, 'Lists', listId);
-
-        try {
-            unsubscribeList = onSnapshot(listRef, (listSnap) => {
-                postIds = listSnap.exists() ? listSnap.data().postIds : [];
-                unsubscribePosts = onSnapshot(q, (querySnapshotPosts) => {
-                    const fetchedPosts = [];
-                    querySnapshotPosts.forEach((doc) => {
-                        let docData = doc.data();
-                        if (!listSnap.exists() || postIds.includes(doc.id)) {
-                            if (docData.completeByDate?.timestamp) {
-                                const millisCompleteBy = docData.completeByDate.timestamp.seconds * 1000 + Math.floor(docData.completeByDate.timestamp.nanoseconds / 1e6);
-                                docData.completeByDate = {
-                                    ...docData.completeByDate,
-                                    timestamp: new Date(millisCompleteBy)
-                                }
-                            }
-                            if (docData.repeatEnds) {
-                                const millisRepeatEnds = docData.repeatEnds.seconds * 1000 + Math.floor(docData.repeatEnds.nanoseconds / 1e6);
-                                docData.repeatEnds = new Date(millisRepeatEnds);
-                            }
-                            fetchedPosts.push({ id: doc.id, ...docData });
-                        }
-                    });
-                    setCompletedTaskItems(fetchedPosts);
-                })
-            })
-        } catch (error) {
-            console.error("Error fetching posts:", error);
-        }
-        return () => { unsubscribePosts(); unsubscribeList(); }
-
-    }
-
 
     const fetchLists = async () => {
         try {
             const response = await axios.get(`http://localhost:8800/api/lists`);
-            const fetchedLists = response.data.data.map(list => ({
+            const fetchedLists = response.data.body.map(list => ({
                 ...list,
                 time_list_created: new Date(list.time_list_created)
             }));
             setListItems(fetchedLists);
-            const foundList = fetchedLists.find((fetchedList) => fetchedList.list_id === listId);
-            if (listId === 0) {
-                setCurrList("Master List");
-                setSelectedLists([]);
-            }
-            else {
-                setCurrList(foundList.list_name);
-                setSelectedLists([foundList.list_id]);
-            }
+            updateListDetails(fetchedLists);
         } catch (error) {
             console.error("Error fetching lists:", error);
         }
     }
 
-    function fetchUserProfile() {
-        const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-        try {
-            const unsubscribeUserProfile = onSnapshot(userProfileRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    setUserProfile(docSnap.data());
-                }
-            })
-            return unsubscribeUserProfile;
-        } catch (error) {
-            console.error("Error fetching user profile:", error);
-        }
-    }
-
-    const arraysAreEqual = (arr1, arr2) => {
-        if (arr1.length !== arr2.length) return false;
-        for (let i = 0; i < arr1.length; i++) {
-            if (arr1[i].task_id !== arr2[i].task_id) return false;
-        }
-        return true;
+    const organizeTasks = (fetchedTasks) => {
+        const fetchedIncompletedTasks = fetchedTasks.filter((task) => {
+            return (listId === 0 || task.lists.includes(listId)) && !task.is_completed;
+        })
+        const fetchedCompletedTasks = fetchedTasks.filter((task) => {
+            return (listId === 0 || task.lists.includes(listId)) && task.is_completed;
+        })
+        sortTasks(fetchedIncompletedTasks);
+        sortCompletedTasks(fetchedCompletedTasks);
     }
 
     const sortTasks = (fetchedTasks) => {
@@ -236,10 +163,31 @@ const TaskListScreen = (props) => {
                 return a.task_name.localeCompare(b.task_name);
             })
         }
-        if (arraysAreEqual(sortedFetchedTasks, taskItems)) {
-            return;
-        }
         setTaskItems(sortedFetchedTasks);
+    }
+
+    const sortCompletedTasks = (fetchedCompletedTasks) => {
+        const sortedCompletedTasks = fetchedCompletedTasks.slice().sort((a, b) => {
+            if (a.time_task_completed < b.time_task_completed) {
+                return 1
+            }
+            else {
+                return -1
+            }
+        })
+        setCompletedTaskItems(sortedCompletedTasks);
+    }
+
+    const updateListDetails = (fetchedLists) => {
+        const foundList = fetchedLists.find((fetchedList) => fetchedList.list_id === listId);
+        if (listId === 0) {
+            setCurrList("Master List");
+            setSelectedLists([]);
+        }
+        else {
+            setCurrList(foundList.list_name);
+            setSelectedLists([foundList.list_id]);
+        }
     }
 
     const completeTask = async (index, complete) => { // clean this
@@ -282,14 +230,6 @@ const TaskListScreen = (props) => {
                     }
                     setCameraOptionModalVisible(false);
                 }
-                // BASICALLY i should just do a patch and i check the complete by date in the backend and post a post based on post flag
-                // a couple of cases to consider
-                // no matter what a task will be updated
-                // if (task.completeByDate && (newCompleteByDate = isRepeatingTask(task.completeByDate.timestamp, task.repeatEnds, task.repeat)))
-                // then i need to post a new task but i should add this check in the backend
-                // if user wants to post then set post true and a post should be posted and handled in the backend
-
-                 // cancel any upcoming notifications PUT IT LATERRRRRQ!!!!!!!!!!!
 
                 let newCompleteByDate;
                 let tempNotifIds = [];
@@ -300,6 +240,8 @@ const TaskListScreen = (props) => {
                         }
                     }
                 }
+
+
 
                 const response = await axios.patch(`http://localhost:8800/api/tasks/${task.task_id}`, {
                     completing: true,
@@ -313,22 +255,17 @@ const TaskListScreen = (props) => {
                 });
                 if (response.data.success) {
                     console.log(response.data.message);
+                    let updatedTasks = allTasks.map(currTask =>
+                            currTask.task_id === task.task_id
+                                ? {...currTask, is_completed: true, time_task_completed: new Date() }
+                                : currTask  
+                        );
+                    if (response.data.new_task_id) {
+                        updatedTasks.push({...task, task_id: response.data.new_task_id, complete_by_date: new Date(newCompleteByDate), notifications: tempNotifIds});
+                    }
+                    setAllTasks(updatedTasks);
                     await cancelNotifications(task.notifications);
                 }
-                
-                
-                // else { // if task does not repeat
-                //     batch.delete(taskRef);
-                //     batch.update(userProfileRef, { tasks: increment(-1) });
-                //     listIds.forEach((listId) => { // remove task from lists
-                //         listRef = doc(listsRef, listId);
-                //         batch.update(listRef, { taskIds: arrayRemove(docId) });
-                //     })
-                //     setTaskItems(prevList => [
-                //         ...prevList.slice(0, index),
-                //         ...prevList.slice(index + 1)
-                //     ]);
-                // }
 
             } catch (error) {
                 // add error if image fails
@@ -353,58 +290,13 @@ const TaskListScreen = (props) => {
 
                 if (response.data.success) {
                     console.log(response.data.message);
+                    let updatedTasks = allTasks.map(currTask =>
+                            currTask.task_id === task.task_id
+                                ? {...currTask, is_completed: false, time_task_completed: null, repeat_interval: null, repeat_ends: null }
+                                : currTask  
+                        );
+                    setAllTasks(updatedTasks);
                 }
-                // batch.set(taskRef, {
-                //     taskName: post.postName,
-                //     description: post.description,
-                //     priority: post.priority,
-                //     reminders: post.reminders,
-                //     completeByDate: post.completeByDate,
-                //     isCompletionTime: post.isCompletionTime,
-                //     listIds: post.listIds,
-                //     timeTaskCreated: post.timeTaskCreated,
-                //     notificationIds: [],
-                //     repeat: null,
-                //     repeatEnds: null,
-                // });
-                // let listRef;
-                // listIds.forEach((listId) => {
-                //     listRef = doc(listsRef, listId);
-                //     batch.update(listRef, { postIds: arrayRemove(docId) });
-                //     batch.update(listRef, { taskIds: arrayUnion(taskRef.id) })
-                // })
-                // const likesRef = collection(postRef, 'Likes');
-                // const commentsRef = collection(postRef, 'Comments');
-                // const likesSnap = await getDocs(likesRef);
-                // likesSnap.forEach(likeDoc => {
-                //     const userLikeRef = doc(FIRESTORE_DB, 'Users', likeDoc.id, 'LikedPosts', docId);
-                //     batch.delete(userLikeRef);
-                //     batch.delete(likeDoc.ref);
-                // });
-
-                // const commentsSnap = await getDocs(commentsRef);
-                // commentsSnap.forEach(commentDoc => {
-                //     batch.delete(commentDoc.ref);
-                // });
-                // batch.delete(postRef);
-                // batch.update(userProfileRef, { posts: increment(-1) });
-                // batch.update(userProfileRef, { tasks: increment(1) });
-                // if (post.reminders.length !== 0) {
-                //     if (await configureNotifications()) {
-                //         const tempNotifIds = await scheduleNotifications(post.reminders, post.completeByDate, post.isCompletionTime, post.postName);
-                //         batch.update(taskRef, { notificationIds: tempNotifIds });
-                //     }
-                // }
-                // const image = post.image;
-                // if (image) {
-                //     const imageRef = ref(getStorage(), image);
-                //     await deleteObject(imageRef);
-                // }
-                // setCompletedTaskItems(prevList => [
-                //     ...prevList.slice(0, index),
-                //     ...prevList.slice(index + 1)
-                // ]);
-                // await batch.commit();
 
             } catch (error) {
                 console.error('Error updating task completion: ', error);
@@ -467,7 +359,6 @@ const TaskListScreen = (props) => {
         return currDueDate;
     }
 
-    //diffentiate delete post and task and make batch
     const deleteItem = async (index, complete) => {
         let taskId = complete ? completedTaskItems[index].task_id : taskItems[index].task_id
         
@@ -475,6 +366,8 @@ const TaskListScreen = (props) => {
             const response = await axios.delete(`http://localhost:8800/api/tasks/${taskId}`);
             if (response.data.success) {
                 console.log(response.data.message)
+                const updatedTasks = allTasks.filter(task => task.task_id !== taskId);
+                setAllTasks(updatedTasks);
                 await cancelNotifications(taskItems[index].notifications);
             }
         } catch (error) {
@@ -828,7 +721,7 @@ const TaskListScreen = (props) => {
                             </TouchableOpacity>
                         </View>
                         <ScrollView style={styles.scrollView} refreshControl={
-                            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                            <RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true)}} />
                         }>
                             <View style={styles.tasksContainer}>
                                 <Text style={styles.sectionTitle}>{currList}</Text>
@@ -854,7 +747,6 @@ const TaskListScreen = (props) => {
                                                     isFirst={isFirst}
                                                     isLast={isLast}
                                                     isSelected={index === editIndex}
-                                                    posted={task.posted}
                                                     info={infoHelper(task)}
                                                 />
                                             </TouchableOpacity>
@@ -881,7 +773,6 @@ const TaskListScreen = (props) => {
                                                     isFirst={isFirst}
                                                     isLast={isLast}
                                                     isSelected={index === completedTaskIndex}
-                                                    posted={task.posted}
                                                     info={null}
                                                 />
                                             </TouchableOpacity>
@@ -892,6 +783,7 @@ const TaskListScreen = (props) => {
                         </ScrollView>
                         <TaskCreation
                             closeSwipeCard={closeSwipeCard}
+                            setAllTasks= {setAllTasks}
                             listItems={listItems}
                             selectedLists={selectedLists}
                             setSelectedLists={setSelectedLists}

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Keyboard, TextInput, Dimensions, TouchableWithoutFeedback, Animated, TouchableOpacity, ScrollView, Modal, Platform } from 'react-native';
 import ScheduleMenu from './ScheduleMenu';
 import ListModal from './PopUpMenus/ListModal';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons,FontAwesome5 } from '@expo/vector-icons';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { FIREBASE_AUTH, FIRESTORE_DB, uploadToFirebase } from '../../../firebaseConfig';
 import { writeBatch, doc, collection, increment, arrayRemove, arrayUnion } from 'firebase/firestore';
@@ -44,8 +44,6 @@ const EditTask = (props) => {
     const [emptyTaskName, setEmptyTaskName] = useState(false);
 
     const textTaskInputRef = useRef(null);
-
-    const currentUser = FIREBASE_AUTH.currentUser;
 
     const screenHeight = Dimensions.get('window').height;
     const defaultHeight = screenHeight * 0.5;
@@ -380,6 +378,9 @@ const EditTask = (props) => {
                             <Ionicons name="chevron-down-outline" size={32} color={colors.primary} />
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setListModalVisible(true)} style={styles.listButton}>
+                            <View style={{marginRight: 5}}>
+                                <FontAwesome5 name="list-ul" size={16} color={colors.primary} />
+                            </View>
                             <Text numberOfLines={1} ellipsizeMode="tail" style={styles.listPicker}>{selectedLists.length == 0 ? "No Lists Selected" : listItems.find(item => item.list_id == selectedLists[0]).list_name + (selectedLists.length == 1 ? "" : ", ...")}</Text>
                             <Ionicons name="chevron-down-outline" size={18} color={colors.primary}/>
                         </TouchableOpacity>

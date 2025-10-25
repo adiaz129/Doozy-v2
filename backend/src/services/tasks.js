@@ -29,7 +29,7 @@ export const postTaskToDB = async (task, userId) => {
         }
 
         await connection.commit();
-        return { success: true, message: "Task created successfully." };
+        return { success: true, message: "Task created successfully.", task_id: result1.insertId };
     } catch (error) {
         console.log(error);
         await connection.rollback();
@@ -51,7 +51,7 @@ export const getAllTasksFromDB = async (userId) => {
             t.repeat_interval, 
             t.repeat_ends, 
             t.is_completed, 
-            t.posted,
+            t.time_task_completed,
             GROUP_CONCAT(DISTINCT tl.list_id) AS lists,
             GROUP_CONCAT(DISTINCT r.reminder_id) AS reminders,
             GROUP_CONCAT(DISTINCT n.notification_id) AS notifications
@@ -73,7 +73,7 @@ export const getAllTasksFromDB = async (userId) => {
             notifications: parseStringIdList(task.notifications),
         }))
 
-        return {success: true, message: 'Get all tasks request successful', data: parsedResult};
+        return {success: true, message: 'Get all tasks request successful', body: parsedResult};
     } catch (error) {
         console.error(error)
         return {success: false, message: 'Failed to get all tasks'};
@@ -92,7 +92,7 @@ export const getTasksByListIdFromDB = async (listId, userId) => {
             t.repeat_interval, 
             t.repeat_ends, 
             t.is_completed, 
-            t.posted,
+            t.time_task_completed,
             GROUP_CONCAT(DISTINCT tl.list_id) AS lists,
             GROUP_CONCAT(DISTINCT r.reminder_id) AS reminders,
             GROUP_CONCAT(DISTINCT n.notification_id) AS notifications
@@ -116,7 +116,7 @@ export const getTasksByListIdFromDB = async (listId, userId) => {
             notifications: parseStringIdList(task.notifications),
         }))
 
-        return {success: true, message: 'Get tasks by list id request successful', data: parsedResult};
+        return {success: true, message: 'Get tasks by list id request successful', body: parsedResult};
     } catch (error) {
         return {success: false, message: 'Failed to get tasks by list id'};
     }
@@ -134,7 +134,7 @@ export const getTaskByIdFromDB = async (taskId, userId) => {
             t.repeat_interval, 
             t.repeat_ends, 
             t.is_completed, 
-            t.posted,
+            t.time_task_completed,
             GROUP_CONCAT(DISTINCT tl.list_id) AS lists,
             GROUP_CONCAT(DISTINCT reminder_id) AS reminders,
             GROUP_CONCAT(DISTINCT notification_id) AS notifications
@@ -156,8 +156,8 @@ export const getTaskByIdFromDB = async (taskId, userId) => {
             reminders: parseIdList(task.reminders),
             notifications: parseStringIdList(task.notifications),
         }))
-
-        return {success: true, message: 'Get task by id successful', data: parsedResult};
+        
+        return {success: true, message: 'Get task by id successful', body: parsedResult};
     } catch (error) {
         return {success: false, message: 'Failed to get task by id'};
     }
@@ -185,7 +185,6 @@ Structure:
 */
 
 export const updateTaskInDB = async (taskId, userId, task) => {
-    console.log(task.task_name);
     const allowedFields = [
         "task_name", 
         "description", 
@@ -265,6 +264,7 @@ export const updateTaskInDB = async (taskId, userId, task) => {
             await connection.query(q2, values2);
         }
 
+        let new_task_id = null;
         if (task.completing && task.new_complete_by_date) {
             const q3 = `SELECT t.task_id, 
                 t.task_name, 
@@ -298,6 +298,8 @@ export const updateTaskInDB = async (taskId, userId, task) => {
             const values4 = [userId, task.task_name, task.description, task.new_complete_by_date, originalTask.is_completion_time, originalTask.priority, originalTask.repeat_interval, originalTask.repeat_ends, false];
             const [newTask] = await connection.query(q4, values4);
 
+            new_task_id = newTask.insertId;
+
             if (Array.isArray(originalTask.lists) && originalTask.lists.length > 0) {
                 const q5 = "INSERT INTO task_list (list_id, task_id) VALUES ?";
                 const values5 = originalTask.lists.map(listId => [listId, newTask.insertId]);
@@ -317,7 +319,7 @@ export const updateTaskInDB = async (taskId, userId, task) => {
             }
         }
         await connection.commit();
-        return { success: true, message: "Task updated successfully." };
+        return { success: true, message: "Task updated successfully.", new_task_id };
     } catch (error) {
         console.log(error);
         await connection.rollback();
@@ -334,7 +336,7 @@ export const deleteTaskInDB = async (taskId, userId) => {
         const [result] = await pool.query(q, values);
         if (result.affectedRows === 0) {
             console.log("No rows deleted — invalid taskId/userId or task doesn't exist.");
-            return { success: false, message: "Task not found or already deleted." };
+            return { success: true, message: "Task not found or already deleted." };
         }
 
         return { success: true, message: 'Task deleted successfully.' };

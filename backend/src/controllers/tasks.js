@@ -19,6 +19,7 @@ export const postTask = async (req, res) => {
 
 export const getTasks = async (req, res) => {
     try {
+        console.log("reading")
         const userId = req.user.uid;
         const listId = req.query.listId;
         let response;
