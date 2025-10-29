@@ -25,10 +25,10 @@ export const postRegister = async (user) => {
             console.log('Duplicate key error on:', keyName);
             let msg;
             let path;
-            if (keyName === 'users.email_UNIQUE') {
+            if (keyName === 'users.email') {
                 path = "email";
                 msg = "Email is already registered.";
-            } else if (keyName === 'users.username_UNIQUE') {
+            } else if (keyName === 'users.username') {
                 path = "username";
                 msg = "Username is already taken.";
             } else {

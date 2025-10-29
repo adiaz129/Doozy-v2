@@ -33,7 +33,7 @@ const ProfileStack = createStackNavigator();
 export default function AppContent() {
   const [loading, setLoading] = useState(false);
 
-  const { auth } = useContext(AuthContext);
+  const { auth, logout } = useContext(AuthContext);
   
   const [fontsLoaded, fontError] = useFonts({
   Poppins_400Regular,

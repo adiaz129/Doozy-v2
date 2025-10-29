@@ -14,22 +14,23 @@ import colors from '../../theme/colors';
 import fonts from '../../theme/fonts';
 import UncheckedTask from '../../assets/unchecked-task.svg';
 import CheckedTask from '../../assets/checked-task.svg';
+import axios from 'axios';
 
 
 const TaskCreation = (props) => {
-    const { closeSwipeCard, listItems, selectedLists, setSelectedLists, nav, configureNotifications, scheduleNotifications, isRepeatingTask } = props;
+    const { closeSwipeCard, setAllTasks, setListItems, listItems, selectedLists, setSelectedLists, nav, configureNotifications, scheduleNotifications, isRepeatingTask, cancelNotifications } = props;
 
     const textTaskInputRef = useRef(null);
 
-    const [newTask, setNewTask] = useState(''); // Task Name
-    const [newDescription, setNewDescription] = useState(''); // Task Description
-    const [selectedDate, setSelectedDate] = useState(null);
-    const [selectedPriority, setSelectedPriority] = useState(0);
-    const [selectedReminders, setSelectedReminders] = useState([]);
-    const [selectedRepeat, setSelectedRepeat] = useState(null);
-    const [isCompleted, setCompleted] = useState(false);
-    const [isTime, setIsTime] = useState(false);
-    const [dateRepeatEnds, setDateRepeatEnds] = useState(null);
+    const [task_name, setTask_name] = useState(''); // Task Name
+    const [description, setDescription] = useState(''); // Task Description
+    const [complete_by_date, setComplete_by_date] = useState(null);
+    const [priority, setPriority] = useState(0);
+    const [reminders, setReminders] = useState([]);
+    const [repeat_interval, setRepeat_interval] = useState(null);
+    const [is_completed, setIs_completed] = useState(false);
+    const [is_completion_time, setIs_completion_time] = useState(false);
+    const [repeat_ends, setRepeat_ends] = useState(null);
     const [hidden, setHidden] = useState(false);
 
     const [showPriority, setShowPriority] = useState(false);
@@ -69,100 +70,141 @@ const TaskCreation = (props) => {
         };
     }, []);
 
-    const storeTask = async (imageURI, hidden) => {
-        if (!currentUser) {
-            console.error("Current user not found.");
-            return;
-        }
-        const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-        const tasksRef = collection(userProfileRef, 'Tasks');
-        const taskRef = doc(tasksRef);
-
-        const batch = writeBatch(FIRESTORE_DB);
-        let cookedBatch;
-        isCompleted ? cookedBatch = await storeCompletedTask(taskRef, batch, imageURI, hidden) : cookedBatch = await storeIncompletedTask(false, taskRef, batch);
-        await cookedBatch.commit();
-        setTaskCreationModalVisible(false);
-    }
-
-    const storeIncompletedTask = async (blockNotifications, taskRef, batch) => {
-        const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
+    const storeTask = async (image, post) => {
         try {
-            batch.set(taskRef, {
-                taskName: newTask,
-                description: newDescription,
-                completeByDate: selectedDate,
-                isCompletionTime: isTime,
-                priority: selectedPriority,
-                reminders: selectedReminders,
-                repeat: selectedRepeat,
-                repeatEnds: dateRepeatEnds,
-                listIds: selectedLists,
-                timeTaskCreated: new Date(),
-                notificationIds: [],
-            });
-            let listRef;
-            selectedLists.forEach((listId) => {
-                listRef = doc(userProfileRef, 'Lists', listId);
-                batch.update(listRef, { taskIds: arrayUnion(taskRef.id) });
-            });
-            batch.update(userProfileRef, { tasks: increment(1) });
-            if (!blockNotifications && selectedReminders.length !== 0) {
+            let notifications = []
+            if (reminders.length !== 0) {
                 if (await configureNotifications()) {
-                    const tempNotifIds = await scheduleNotifications(selectedReminders, selectedDate, isTime, newTask);
-                    batch.update(taskRef, { notificationIds: tempNotifIds });
+                    notifications = await scheduleNotifications(reminders, complete_by_date, is_completion_time, task_name);
                 }
             }
-            return batch;
-        } catch (error) {
-            console.error("Error storing task:", error);
+            const response = await axios.post('http://localhost:8800/api/tasks', {
+                    task_name, 
+                    description, 
+                    complete_by_date: complete_by_date ? new Date(complete_by_date).toISOString().slice(0, 19).replace('T', ' ') : null, 
+                    is_completion_time, 
+                    priority, 
+                    repeat_interval, 
+                    repeat_ends: repeat_ends ? new Date(repeat_ends).toISOString().slice(0, 19).replace('T', ' ') : null, 
+                    is_completed, 
+                    post, 
+                    lists: selectedLists, 
+                    reminders, 
+                    notifications, 
+                    image
+                });
+            if (response.data.success) {
+                setAllTasks(prev => [...prev, {
+                    task_id: response.data.task_id, 
+                    task_name, 
+                    description, 
+                    complete_by_date: complete_by_date ? complete_by_date : null, 
+                    is_completion_time, 
+                    priority, 
+                    repeat_interval, 
+                    repeat_ends: repeat_ends ? repeat_ends : null, 
+                    is_completed, 
+                    lists: selectedLists, 
+                    reminders, 
+                    notifications, 
+                    time_task_created: new Date(),
+                    time_task_completed: null
+                }])
+                console.log(response.data.message);
+
+            }
+        } catch (error) { // add an error check for 401 and logout
+            console.log(error.response.data.message);
+            // await cancelNotifications(notifications);
+        } finally {
+            setTaskCreationModalVisible(false);
         }
     }
 
-    const storeCompletedTask = async (taskRef, batch, imageURI, hidden) => {
-        const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-        const postsRef = collection(FIRESTORE_DB, 'Posts');
-        const postRef = doc(postsRef);
+    // const storeTask = async (imageURI, hidden) => {
+    //     is_completed ? cookedBatch = await storeCompletedTask(taskRef, batch, imageURI, hidden) : cookedBatch = await storeIncompletedTask(false, taskRef, batch);
+    //     await cookedBatch.commit();
+    //     setTaskCreationModalVisible(false);
+    // }
 
-        try {
-            batch.set(postRef, {
-                userId: currentUser.uid,
-                postName: newTask,
-                description: newDescription,
-                timePosted: new Date(),
-                timeTaskCreated: new Date(),
-                image: imageURI,
-                completeByDate: selectedDate,
-                isCompletionTime: isTime,
-                priority: selectedPriority,
-                reminders: selectedReminders,
-                listIds: selectedLists,
-                hidden: hidden,
-                likeCount: 0,
-                commentCount: 0,
-            })
-            let listRef;
-            selectedLists.forEach((listId) => {
-                listRef = doc(userProfileRef, 'Lists', listId);
-                batch.update(listRef, { postIds: arrayUnion(postRef.id) });
-            });
-            let newCompleteByDate;
-            if (selectedDate && (newCompleteByDate = isRepeatingTask(selectedDate.timestamp, dateRepeatEnds, selectedRepeat))) {
-                batch = await storeIncompletedTask(true, taskRef, batch);
-                batch.update(taskRef, { completeByDate: newCompleteByDate });
-                if (selectedReminders.length !== 0) {
-                    if (await configureNotifications()) {
-                        const tempNotifIds = await scheduleNotifications(selectedReminders, newCompleteByDate, isTime, newTask);
-                        batch.update(taskRef, { notificationIds: tempNotifIds });
-                    }
-                }
-            }
-            batch.update(userProfileRef, { posts: increment(1) });
-            return batch;
-        } catch (error) {
-            console.error("Error storing post:", error);
-        }
-    }
+    // const storeIncompletedTask = async (blockNotifications, taskRef, batch) => {
+    //     const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
+    //     try {
+    //         batch.set(taskRef, {
+    //             taskName: task_name,
+    //             description: description,
+    //             completeByDate: complete_by_date,
+    //             isCompletionTime: is_completion_time,
+    //             priority: priority,
+    //             reminders: reminders,
+    //             repeat_interval: repeat_interval,
+    //             repeatEnds: repeat_ends,
+    //             listIds: selectedLists,
+    //             timeTaskCreated: new Date(),
+    //             notificationIds: [],
+    //         });
+    //         let listRef;
+    //         selectedLists.forEach((listId) => {
+    //             listRef = doc(userProfileRef, 'Lists', listId);
+    //             batch.update(listRef, { taskIds: arrayUnion(taskRef.id) });
+    //         });
+    //         batch.update(userProfileRef, { tasks: increment(1) });
+    //         if (!blockNotifications && reminders.length !== 0) {
+    //             if (await configureNotifications()) {
+    //                 const tempNotifIds = await scheduleNotifications(reminders, complete_by_date, is_completion_time, task_name);
+    //                 batch.update(taskRef, { notificationIds: tempNotifIds });
+    //             }
+    //         }
+    //         return batch;
+    //     } catch (error) {
+    //         console.error("Error storing task:", error);
+    //     }
+    // }
+
+    // const storeCompletedTask = async (taskRef, batch, imageURI, hidden) => {
+    //     const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
+    //     const postsRef = collection(FIRESTORE_DB, 'Posts');
+    //     const postRef = doc(postsRef);
+
+    //     try {
+    //         batch.set(postRef, {
+    //             userId: currentUser.uid,
+    //             postName: task_name,
+    //             description: description,
+    //             timePosted: new Date(),
+    //             timeTaskCreated: new Date(),
+    //             image: imageURI,
+    //             completeByDate: complete_by_date,
+    //             isCompletionTime: is_completion_time,
+    //             priority: priority,
+    //             reminders: reminders,
+    //             listIds: selectedLists,
+    //             hidden: hidden,
+    //             likeCount: 0,
+    //             commentCount: 0,
+    //         })
+    //         let listRef;
+    //         selectedLists.forEach((listId) => {
+    //             listRef = doc(userProfileRef, 'Lists', listId);
+    //             batch.update(listRef, { postIds: arrayUnion(postRef.id) });
+    //         });
+    //         let newCompleteByDate;
+    //         if (complete_by_date && (newCompleteByDate = isRepeatingTask(complete_by_date.timestamp, repeat_ends, repeat_interval))) {
+    //             batch = await storeIncompletedTask(true, taskRef, batch);
+    //             batch.update(taskRef, { completeByDate: newCompleteByDate });
+    //             if (reminders.length !== 0) {
+    //                 if (await configureNotifications()) {
+    //                     const tempNotifIds = await scheduleNotifications(reminders, newCompleteByDate, is_completion_time, task_name);
+    //                     batch.update(taskRef, { notificationIds: tempNotifIds });
+    //                 }
+    //             }
+    //         }
+    //         batch.update(userProfileRef, { posts: increment(1) });
+    //         return batch;
+    //     } catch (error) {
+    //         console.error("Error storing post:", error);
+    //     }
+    // }
 
     const toggleCalendarModal = () => {
         setCalendarModalVisible(!isCalendarModalVisible);
@@ -200,9 +242,9 @@ const TaskCreation = (props) => {
     }
 
     const handleSubmitHelper = async () => {
-        if (isCompleted) {
+        if (is_completed) {
             let imageURI;
-            let hidden = false;
+            let post = true;
             while (true) {
                 const cameraOption = await openCameraOptionMenu();
                 if (cameraOption == 'cancel') {
@@ -223,7 +265,7 @@ const TaskCreation = (props) => {
                 }
                 else if (cameraOption == 'no post') {
                     imageURI = null;
-                    hidden = true;
+                    post = false;
                     break;
                 }
                 else {
@@ -232,28 +274,28 @@ const TaskCreation = (props) => {
                 }
             }
             setCameraOptionModalVisible(false); //add loading screen here
-            storeTask(imageURI, hidden);
+            storeTask(imageURI, post);
         }
         else {
             storeTask(null, false);
         }
-        setNewTask('');
-        setNewDescription('');
-        setCompleted(false);
+        setTask_name('');
+        setDescription('');
+        setIs_completed(false);
         setSelectedLists([]);
-        setSelectedDate(null);
-        setSelectedPriority(0);
-        setSelectedReminders([]);
-        setSelectedRepeat(null);
-        setIsTime(false);
-        setDateRepeatEnds(null);
+        setComplete_by_date(null);
+        setPriority(0);
+        setReminders([]);
+        setRepeat_interval(null);
+        setIs_completion_time(false);
+        setRepeat_ends(null);
         setShowPriority(false);
         setHidden(false);
     };
 
 
     const checker = () => {
-        isCompleted ? setCompleted(false) : setCompleted(true);
+        is_completed ? setIs_completed(false) : setIs_completed(true);
     }
 
     const flagColor = [colors.primary, colors.secondary, colors.accent, colors.red];
@@ -277,17 +319,18 @@ const TaskCreation = (props) => {
                     <View style={{ height: modalHeight, ...styles.calendarModalContainer }}>
                         <ScheduleMenu
                             setCalendarModalVisible={setCalendarModalVisible}
-                            selectedDate={selectedDate}
-                            setSelectedDate={setSelectedDate}
-                            isTime={isTime}
-                            setIsTime={setIsTime}
-                            selectedReminders={selectedReminders}
-                            setSelectedReminders={setSelectedReminders}
-                            selectedRepeat={selectedRepeat}
-                            setSelectedRepeat={setSelectedRepeat}
-                            dateRepeatEnds={dateRepeatEnds}
-                            setDateRepeatEnds={setDateRepeatEnds}
+                            selectedDate={complete_by_date}
+                            setSelectedDate={setComplete_by_date}
+                            isTime={is_completion_time}
+                            setIsTime={setIs_completion_time}
+                            selectedReminders={reminders}
+                            setSelectedReminders={setReminders}
+                            selectedRepeat={repeat_interval}
+                            setSelectedRepeat={setRepeat_interval}
+                            dateRepeatEnds={repeat_ends}
+                            setDateRepeatEnds={setRepeat_ends}
                         />
+
                     </View>
                 </Modal>
                 <Modal
@@ -302,6 +345,7 @@ const TaskCreation = (props) => {
                     <ListModal
                         selectedLists={selectedLists}
                         setSelectedLists={setSelectedLists}
+                        setListItems={setListItems}
                         listItems={listItems}
                         setListModalVisible={setListModalVisible}
                     />
@@ -327,7 +371,7 @@ const TaskCreation = (props) => {
                         <View style={styles.inputWrapper}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <TouchableOpacity onPress={checker} style={styles.checkedbox}>
-                                    {isCompleted ? (
+                                    {is_completed ? (
                                         <CheckedTask width={32} height={32} />
                                     ) : (
                                         <UncheckedTask width={32} height={32} />
@@ -336,22 +380,22 @@ const TaskCreation = (props) => {
                                 <TextInput
                                     ref={textTaskInputRef}
                                     style={styles.inputTask}
-                                    onChangeText={text => { setNewTask(text)}}
-                                    value={newTask}
+                                    onChangeText={text => { setTask_name(text)}}
+                                    value={task_name}
                                     placeholder={'Type your task here...'}
                                     placeholderTextColor={'#C7C7CD'}
                                     autoCorrect={false}
                                 />
                             </View>
-                            {newTask.length > 0 && <TouchableOpacity onPress={handleSubmitHelper}>
+                            {task_name.length > 0 && <TouchableOpacity onPress={handleSubmitHelper}>
                                 <Ionicons name={'arrow-up-circle'} size={28} color={colors.accent} />
                             </TouchableOpacity>}
                         </View>
                         <View style={styles.descriptionWrapper}>
                             <TextInput
                                 style={styles.inputDescription}
-                                onChangeText={text => setNewDescription(text)}
-                                value={newDescription}
+                                onChangeText={text => setDescription(text)}
+                                value={description}
                                 placeholder={'Description…'}
                                 placeholderTextColor={'#C7C7CD'}
                             />
@@ -365,7 +409,7 @@ const TaskCreation = (props) => {
                                     <Icon
                                         name="calendar"
                                         size={28}
-                                        color={selectedDate ? colors.accent : colors.primary}
+                                        color={complete_by_date ? colors.accent : colors.primary}
                                     />
                                 </View>
                             </TouchableOpacity>
@@ -375,7 +419,7 @@ const TaskCreation = (props) => {
                             >
                                 <View style={styles.iconContainer}>
                                     {selectedLists.length === 0 ?
-                                        <FontAwesome5 name="list-ul" size={28} color={colors.primary} />
+                                        <FontAwesome5 name="list-alt" size={28} color={colors.primary} />
                                         :
                                         <FontAwesome5 name="list-alt" size={28} color={colors.accent} />
                                     }
@@ -389,13 +433,13 @@ const TaskCreation = (props) => {
                                     {!showPriority ? (<Icon
                                         name="flag"
                                         size={28}
-                                        color={flagColor[selectedPriority]}
+                                        color={flagColor[priority]}
                                     />)
                                         : (<Feather name="x-circle" size={28} color={colors.primary} />)}
                                 </View>
                             </TouchableOpacity>
                             {showPriority && (<View style={styles.priorityContainer}>
-                                <TouchableOpacity onPress={() => { selectedPriority == 1 ? setSelectedPriority(0) : setSelectedPriority(1) }} style={[selectedPriority == 1 ? { width: 75, ...styles.selectedPriorityButton } : { width: 60 }, styles.priorityButtonLow]}>
+                                <TouchableOpacity onPress={() => { priority == 1 ? setPriority(0) : setPriority(1) }} style={[priority == 1 ? { width: 75, ...styles.priorityButton } : { width: 60 }, styles.priorityButtonLow]}>
                                     <View style={styles.priorityButtonContainer}>
                                         <Icon
                                             name="flag"
@@ -403,10 +447,10 @@ const TaskCreation = (props) => {
                                             color={flagColor[1]}
                                         />
                                         <Text style={styles.priorityText}>Low</Text>
-                                        {selectedPriority == 1 && <Feather name="x" size={16} color={colors.primary} />}
+                                        {priority == 1 && <Feather name="x" size={16} color={colors.primary} />}
                                     </View>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={() => { selectedPriority == 2 ? setSelectedPriority(0) : setSelectedPriority(2) }} style={[selectedPriority == 2 ? { width: 80, ...styles.selectedPriorityButton } : { width: 65 }, styles.priorityButtonMed]}>
+                                <TouchableOpacity onPress={() => { priority == 2 ? setPriority(0) : setPriority(2) }} style={[priority == 2 ? { width: 80, ...styles.priorityButton } : { width: 65 }, styles.priorityButtonMed]}>
                                     <View style={styles.priorityButtonContainer}>
                                         <Icon
                                             name="flag"
@@ -414,10 +458,10 @@ const TaskCreation = (props) => {
                                             color={flagColor[2]}
                                         />
                                         <Text style={styles.priorityText}>Med</Text>
-                                        {selectedPriority == 2 && <Feather name="x" size={16} color={colors.primary} />}
+                                        {priority == 2 && <Feather name="x" size={16} color={colors.primary} />}
                                     </View>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={() => { selectedPriority == 3 ? setSelectedPriority(0) : setSelectedPriority(3) }} style={[selectedPriority == 3 ? { width: 85, ...styles.selectedPriorityButton } : { width: 70 }, styles.priorityButtonHigh]}>
+                                <TouchableOpacity onPress={() => { priority == 3 ? setPriority(0) : setPriority(3) }} style={[priority == 3 ? { width: 85, ...styles.priorityButton } : { width: 70 }, styles.priorityButtonHigh]}>
                                     <View style={styles.priorityButtonContainer}>
                                         <Icon
                                             name="flag"
@@ -425,7 +469,7 @@ const TaskCreation = (props) => {
                                             color={flagColor[3]}
                                         />
                                         <Text style={styles.priorityText}>High</Text>
-                                        {selectedPriority == 3 && <Feather name="x" size={16} color={colors.primary} />}
+                                        {priority == 3 && <Feather name="x" size={16} color={colors.primary} />}
                                     </View>
                                 </TouchableOpacity>
                             </View>)}
@@ -595,7 +639,7 @@ const styles = StyleSheet.create({
         verticalAlign: 'center',
         rowGap: 10,
     },
-    selectedPriorityButton: {
+    priorityButton: {
         backgroundColor: colors.tint,
     },
     priorityButtonLow: {

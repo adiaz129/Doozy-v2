@@ -10,6 +10,7 @@ import { Ionicons, Feather} from '@expo/vector-icons';
 import colors from '../../theme/colors';
 import fonts from '../../theme/fonts';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import { dateToDayObj } from '../../utils/timeFunctions.js';
 
 const ScheduleMenu = (props) => {
 
@@ -26,8 +27,8 @@ const ScheduleMenu = (props) => {
     };
     const { setCalendarModalVisible, selectedDate, setSelectedDate, isTime, setIsTime, selectedReminders, setSelectedReminders, selectedRepeat, setSelectedRepeat, dateRepeatEnds, setDateRepeatEnds } = props;
 
-    const [tempSelectedDate, setTempSelectedDate] = useState(!selectedDate ? getTodayDate() : selectedDate);
-    const [tempTime, setTempTime] = useState(isTime ? selectedDate.timestamp : new Date());
+    const [tempSelectedDate, setTempSelectedDate] = useState(!selectedDate ? getTodayDate() : dateToDayObj(selectedDate));
+    const [tempTime, setTempTime] = useState(isTime ? selectedDate : new Date());
     const [tempSelectedReminders, setTempSelectedReminders] = useState(selectedReminders);
     const [tempSelectedRepeat, setTempSelectedRepeat] = useState(selectedRepeat);
     const [isDateRepeatEnds, setIsDateRepeatEnds] = useState(dateRepeatEnds ? true : false);
@@ -58,9 +59,13 @@ const ScheduleMenu = (props) => {
 
 
     const handleDateSelect = (date) => {
-        setTempSelectedDate(date);
-        if (tempDateRepeatEnds < date.timestamp) {
-            setTempDateRepeatEnds(new Date(date.year, date.month - 1, date.day));
+        const localDate = new Date(date.year, date.month - 1, date.day);
+        setTempSelectedDate({
+            ...date,
+            timestamp: localDate.getTime()
+        });
+        if (tempDateRepeatEnds < localDate.getTime()) {
+            setTempDateRepeatEnds(localDate);
         }
     };
 
@@ -218,29 +223,13 @@ const ScheduleMenu = (props) => {
 
     const handleSaveChanges = () => {
         const date = new Date(tempSelectedDate.year, tempSelectedDate.month - 1, tempSelectedDate.day);
-        if (isTempTime) {
-            tempSelectedDate.timestamp = new Date(
-                date.getFullYear(),
-                date.getMonth(),
-                date.getDate(),
-                tempTime.getHours(),
-                tempTime.getMinutes(),
-                0,
-                0,
-            );
-        }
-        else {
-            tempSelectedDate.timestamp = new Date(
-                date.getFullYear(),
-                date.getMonth(),
-                date.getDate(),
-                0,
-                0,
-                0,
-                0,
-            );
-        }
-        setSelectedDate(tempSelectedDate);
+        const dateWithTime = new Date(tempSelectedDate.year, tempSelectedDate.month - 1, tempSelectedDate.day,
+                             isTempTime ? tempTime.getHours() : 0,
+                             isTempTime ? tempTime.getMinutes() : 0,
+                             0, 0);
+
+        tempSelectedDate.timestamp = dateWithTime.getTime();
+        setSelectedDate(new Date(tempSelectedDate.timestamp));
         setIsTime(isTempTime);
         setSelectedReminders(tempSelectedReminders);
         setSelectedRepeat(tempSelectedRepeat);

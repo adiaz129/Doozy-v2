@@ -43,6 +43,7 @@ const Register = () => {
         try {
             const response = await axios.post('http://localhost:8800/api/auth/register', {name, email, password, username, confirmPassword});
             if (response.data.success) {
+                console.log(response.data);
                 await setAuth(response.data.token);
             }
 

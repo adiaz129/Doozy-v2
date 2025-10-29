@@ -110,3 +110,24 @@ export const getDueDateString = (timestamp, isTime) => {
     }
   }
 }
+
+const dateToLocalDateString = (date) => {
+  // date is a Date object
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const dateToDayObj = (date) => {
+
+  const dateString = dateToLocalDateString(date);
+  const dateObject = {
+    day: date.getDate(),
+    month: date.getMonth() + 1,
+    year: date.getFullYear(),
+    timestamp: date.getTime(),
+    dateString, // use local date string here
+  };
+  return dateObject
+}
