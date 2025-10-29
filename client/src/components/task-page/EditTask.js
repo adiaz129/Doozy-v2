@@ -233,10 +233,6 @@ const EditTask = (props) => {
                     setAllTasks(updatedTasks);
                 }
             }
-            if (response.data.success) {
-                console.log(response.data.message);
-                await cancelNotifications(task.notifications);
-            }
             setTimeout(() => {
                 toggleEditTaskVisible()
             }, 100);

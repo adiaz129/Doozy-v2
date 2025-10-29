@@ -18,7 +18,7 @@ import axios from 'axios';
 
 
 const TaskCreation = (props) => {
-    const { closeSwipeCard, setAllTasks, listItems, selectedLists, setSelectedLists, nav, configureNotifications, scheduleNotifications, isRepeatingTask, cancelNotifications } = props;
+    const { closeSwipeCard, setAllTasks, setListItems, listItems, selectedLists, setSelectedLists, nav, configureNotifications, scheduleNotifications, isRepeatingTask, cancelNotifications } = props;
 
     const textTaskInputRef = useRef(null);
 
@@ -345,6 +345,7 @@ const TaskCreation = (props) => {
                     <ListModal
                         selectedLists={selectedLists}
                         setSelectedLists={setSelectedLists}
+                        setListItems={setListItems}
                         listItems={listItems}
                         setListModalVisible={setListModalVisible}
                     />

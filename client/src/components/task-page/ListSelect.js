@@ -9,7 +9,7 @@ import axios from 'axios';
 
 
 const ListSelect = (props) => {
-    const {setOpenDrawer, listItems, listId, setListId, userProfile} = props; // change to count(task_id)
+    const {setOpenDrawer, setListItems, listItems, setCurrListName, listId, setListId, userProfile} = props; // change to count(task_id)
     const allListItems = [{list_id: 0, list_name: 'Master List', taskNumber: userProfile ? userProfile.tasks : 0}, ...listItems]
     const [addListModalVisible, setAddListModalVisible] = useState(false);
     const [listName, setListName] = useState("");
@@ -72,8 +72,8 @@ const ListSelect = (props) => {
             const response = await axios.post('http://localhost:8800/api/lists', {
                 list_name: listName
             });
+            setListItems(prev => [{ list_id: response.data.list_id, list_name: listName, time_list_created: new Date() }, ...prev]);
             dismissModal();
-            console.log(response.data)
             setListId(response.data.list_id);
         } catch (error) {
             console.error(error.response.data.message);
@@ -82,10 +82,20 @@ const ListSelect = (props) => {
 
     const editList = async () => {
         try {
-            const listRef = doc(FIRESTORE_DB, 'Users', currentUser.uid, 'Lists', currList.id);
-            await updateDoc(listRef, {name: listName});
+            const response = await axios.patch(`http://localhost:8800/api/lists/${currList.list_id}`, {
+                list_name: listName
+            });
+            setListItems(prev => prev.map(list => 
+                list.list_id == currList.list_id 
+                ? {...list, list_name: listName}
+                : list
+            ));
+            if (listId === currList.list_id) {
+                setCurrListName(listName);
+            }
             dismissModal();
             setEdit(false);
+            setCurrList(null);
         } catch (error) {
             console.error("Error editing list:", error)
         }
@@ -93,25 +103,16 @@ const ListSelect = (props) => {
 
     const deleteList = async(list) => {
         try {
-            const batch = writeBatch(FIRESTORE_DB);
-            let taskRef;
-            let postRef;
-            const listRef = doc(FIRESTORE_DB, 'Users', currentUser.uid, 'Lists', list.id);
-            list.taskIds.forEach((taskId) => {
-                taskRef = doc(FIRESTORE_DB, 'Users', currentUser.uid, 'Tasks', taskId);
-                batch.update(taskRef, {listIds: arrayRemove(list.id)});
-            })
-            list.postIds.forEach((postId) => {
-                postRef = doc(FIRESTORE_DB, 'Posts', postId);
-                batch.update(postRef, {listIds: arrayRemove(list.id)});
-            })
-            batch.delete(listRef);
-            await batch.commit();
+            const response = await axios.delete(`http://localhost:8800/api/lists/${currList.list_id}`);
             setListMenuModalVisible(false);
             setCurrList(null)
-            if (listId == list.id) {
+            setListItems(prev => prev.filter(item =>
+                item.list_id !== currList.list_id
+            ))
+            if (listId == list.list_id) {
                 setListId(0);
             }
+
         } catch (error) {
             console.error("Error deleting list:", error);
         }
@@ -193,7 +194,7 @@ const ListSelect = (props) => {
                     <View style={styles.listMenuBackground}>
                         <TouchableWithoutFeedback>
                             <View style={[currYPosition * 2 > screenHeight ? {top: currYPosition - 70} : {top: currYPosition + 40}, {left: listMenuXPosition}, styles.listMenu]}>
-                                <TouchableOpacity onPress={() => {setEdit(true); setListName(currList.name); setListMenuModalVisible(false); openModal(); setCurrList(null);}}style={styles.listMenuButtons}>
+                                <TouchableOpacity onPress={() => {setEdit(true); setListName(currList.list_name); setListMenuModalVisible(false); openModal();}}style={styles.listMenuButtons}>
                                     <Text style={styles.listMenuText}>Rename</Text>
                                     <Ionicons name="create-outline" size={18} color={colors.primary} />
                                 </TouchableOpacity>

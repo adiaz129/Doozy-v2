@@ -45,7 +45,7 @@ const TaskListScreen = (props) => {
     const [sortYPosition, setSortYPosition] = useState();
     const [cameraOptionModalVisible, setCameraOptionModalVisible] = useState(false);
     const [resolver, setResolver] = useState(null);
-    const [currList, setCurrList] = useState("");
+    const [currListName, setCurrListName] = useState("");
     const [refreshing, setRefreshing] = useState(false);
     const unsubscribeRef = useRef();
     const sortRef = useRef(null);
@@ -180,11 +180,11 @@ const TaskListScreen = (props) => {
     const updateListDetails = (fetchedLists) => {
         const foundList = fetchedLists.find((fetchedList) => fetchedList.list_id === listId);
         if (listId === 0) {
-            setCurrList("Master List");
+            setCurrListName("Master List");
             setSelectedLists([]);
         }
         else {
-            setCurrList(foundList.list_name);
+            setCurrListName(foundList.list_name);
             setSelectedLists([foundList.list_id]);
         }
     }
@@ -569,7 +569,15 @@ const TaskListScreen = (props) => {
                     onOpen={() => { closeSwipeCard(); setOpenDrawer(true); }}
                     onClose={() => setOpenDrawer(false)}
                     renderDrawerContent={() => {
-                        return <ListSelect setOpenDrawer={setOpenDrawer} listItems={listItems} listId={listId} setListId={setListId} userProfile={userProfile} />;
+                        return <ListSelect 
+                                    setOpenDrawer={setOpenDrawer} 
+                                    setListItems={setListItems}
+                                    listItems={listItems} 
+                                    setCurrListName={setCurrListName}
+                                    listId={listId} 
+                                    setListId={setListId} 
+                                    userProfile={userProfile} 
+                                />;
                     }}
                     drawerStyle={{
                         width: '70%',
@@ -724,7 +732,7 @@ const TaskListScreen = (props) => {
                             <RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true)}} />
                         }>
                             <View style={styles.tasksContainer}>
-                                <Text style={styles.sectionTitle}>{currList}</Text>
+                                <Text style={styles.sectionTitle}>{currListName}</Text>
                                 {taskItems.length === 0 && (<View style={styles.emptyTasks}>
                                     <FontAwesome name={"pencil-square-o"} color={colors.primary} size={30} />
                                     <Text style={styles.emptyTasksText}>No tasks yet</Text>
@@ -783,7 +791,8 @@ const TaskListScreen = (props) => {
                         </ScrollView>
                         <TaskCreation
                             closeSwipeCard={closeSwipeCard}
-                            setAllTasks= {setAllTasks}
+                            setAllTasks={setAllTasks}
+                            setListItems={setListItems}
                             listItems={listItems}
                             selectedLists={selectedLists}
                             setSelectedLists={setSelectedLists}

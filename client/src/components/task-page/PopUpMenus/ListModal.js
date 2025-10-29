@@ -10,8 +10,7 @@ import axios from 'axios';
 
 const ListModal = (props) => {
 
-  const { selectedLists, setSelectedLists, listItems, setListModalVisible } = props;
-  console.log(listItems)
+  const { selectedLists, setSelectedLists, setListItems, listItems, setListModalVisible } = props;
   const currentUser = FIREBASE_AUTH.currentUser;
 
   const [showAddList, setShowAddList] = useState(false);
@@ -55,7 +54,6 @@ const ListModal = (props) => {
   const handleListPress = (currId) => {
     if (selectedLists.includes(currId)) {
       let filteredList = selectedLists.filter(id => id !== currId);
-      console.log("filteredList")
       setSelectedLists(filteredList);
     }
     else {
@@ -69,11 +67,10 @@ const ListModal = (props) => {
 
   const addList = async () => {
         try {
-          console.log("HIIIIII")
             const response = await axios.post('http://localhost:8800/api/lists', {
                 list_name: listInputText
             });
-            console.log("HIII")
+            setListItems(prev => [{ list_id: response.data.list_id, list_name: listInputText, time_list_created: new Date() }, ...prev]);
             setSelectedLists([...selectedLists, response.data.list_id]);
             setListInputText("");
             setShowAddList(false);
