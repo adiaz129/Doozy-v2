@@ -16,7 +16,7 @@ import CheckedTask from '../../assets/checked-task.svg';
 import axios from 'axios';
 
 const EditTask = (props) => {
-    const { task, setTaskItems, index, listItems, toggleEditTaskVisible, configureNotifications, scheduleNotifications, cancelNotifications, isRepeatingTask, deleteItem } = props;
+    const { task, allTasks, setAllTasks, index, listItems, toggleEditTaskVisible, configureNotifications, scheduleNotifications, cancelNotifications, isRepeatingTask, deleteItem } = props;
 
     const priorityRef = useRef(null);
 
@@ -106,6 +106,27 @@ const EditTask = (props) => {
                     notifications: tempNotifIds,
                     is_completed: false,
                 });
+                if (response.data.success) {
+                    await cancelNotifications(task.notifications);
+                    let updatedTasks = allTasks.map(currTask =>
+                            currTask.task_id === task.task_id
+                                ? {...currTask, 
+                                    task_name: editedTaskName,
+                                    description: editedDescription,
+                                    complete_by_date: selectedDate,
+                                    is_completion_time: isTime,
+                                    priority: selectedPriority,
+                                    reminders: selectedReminders,
+                                    repeat_interval: selectedRepeat,
+                                    repeat_ends: dateRepeatEnds,
+                                    lists: selectedLists,
+                                    notifications: tempNotifIds,
+                                    is_completed: false, 
+                                }
+                                : currTask  
+                        );
+                    setAllTasks(updatedTasks);
+                }
             }
             else {
                 setSaveChangesModalVisible(false);
@@ -174,6 +195,43 @@ const EditTask = (props) => {
                     new_notifications: tempNotifIds,
                     is_completed: true,
                 });
+                if (response.data.success) {
+                    await cancelNotifications(task.notifications);
+                    let updatedTasks = allTasks.map(currTask =>
+                            currTask.task_id === task.task_id
+                                ? {...currTask, 
+                                    task_name: editedTaskName,
+                                    description: editedDescription,
+                                    complete_by_date: selectedDate,
+                                    is_completion_time: isTime,
+                                    priority: selectedPriority,
+                                    reminders: selectedReminders,
+                                    repeat_interval: selectedRepeat,
+                                    repeat_ends: dateRepeatEnds,
+                                    lists: selectedLists,
+                                    notifications: [],
+                                    is_completed: true, 
+                                    time_task_completed: new Date()
+                                }
+                                : currTask
+                        );
+                        updatedTasks.push({
+                            task_id: response.data.task_id,
+                            task_name: editedTaskName,
+                            description: editedDescription,
+                            complete_by_date: selectedDate,
+                            is_completion_time: isTime,
+                            priority: selectedPriority,
+                            reminders: selectedReminders,
+                            repeat_interval: selectedRepeat,
+                            repeat_ends: dateRepeatEnds,
+                            lists: selectedLists,
+                            notifications: tempNotifIds,
+                            is_completed: false,
+                            time_task_created: new Date()
+                        })
+                    setAllTasks(updatedTasks);
+                }
             }
             if (response.data.success) {
                 console.log(response.data.message);

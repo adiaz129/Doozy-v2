@@ -58,7 +58,6 @@ const TaskListScreen = (props) => {
     }, [refreshing]);
 
     useEffect(() => {
-        console.log("organizing")
         organizeTasks(allTasks);
     }, [order, listId, allTasks]);
 
@@ -261,7 +260,7 @@ const TaskListScreen = (props) => {
                                 : currTask  
                         );
                     if (response.data.new_task_id) {
-                        updatedTasks.push({...task, task_id: response.data.new_task_id, complete_by_date: new Date(newCompleteByDate), notifications: tempNotifIds});
+                        updatedTasks.push({...task, task_id: response.data.new_task_id, complete_by_date: new Date(newCompleteByDate), notifications: tempNotifIds, time_task_created: new Date()});
                     }
                     setAllTasks(updatedTasks);
                     await cancelNotifications(task.notifications);
@@ -587,7 +586,8 @@ const TaskListScreen = (props) => {
                         >
                             <EditTask
                                 task={taskItems[editIndex]}
-                                setTaskItems={setTaskItems}
+                                allTasks={allTasks}
+                                setAllTasks={setAllTasks}
                                 index={editIndex}
                                 listItems={listItems}
                                 toggleEditTaskVisible={toggleEditTaskVisible}
@@ -867,6 +867,7 @@ const styles = StyleSheet.create({
     scrollView: {
         paddingTop: 10,
         marginBottom: 40,
+        height: 100
     },
     taskContainer: {
         backgroundColor: colors.red,
