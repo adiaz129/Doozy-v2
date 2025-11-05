@@ -8,7 +8,7 @@ const usersQuery = `CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(30) NOT NULL UNIQUE,
     username_lower VARCHAR(30) NOT NULL UNIQUE,
     bio VARCHAR(150) DEFAULT NULL,
-    profile_pic VARCHAR(255),
+    profile_pic VARCHAR(255) DEFAULT NULL,
     post_count INT NOT NULL DEFAULT 0,
     task_count INT NOT NULL DEFAULT 0,
     friend_count INT NOT NULL DEFAULT 0

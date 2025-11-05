@@ -80,7 +80,7 @@ export default function AppContent() {
   function ProfileStackScreen() {
     return (
       <ProfileStack.Navigator initialRouteName='Profile' screenOptions={{ headerShown: false }}>
-        <ProfileStack.Screen name="Profile" component={ProfileScreen} initialParams={{ userID: FIREBASE_AUTH.currentUser?.uid, status: 'currentUser' }} />
+        <ProfileStack.Screen name="Profile" component={ProfileScreen} initialParams={{ userID: auth?.uid, status: 'currentUser' }} />
         <ProfileStack.Screen name="Friends" component={FriendsScreen} />
         <ProfileStack.Screen name="AddFriends" component={AddFriendsScreen} />
         <ProfileStack.Screen name="Settings" component={SettingsScreen} />

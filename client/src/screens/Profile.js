@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FIREBASE_AUTH, FIRESTORE_DB } from '../../firebaseConfig';
+import { FIRESTORE_DB } from '../../firebaseConfig';
 import { doc, getDoc, collection, getDocs, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image, ScrollView, ImageBackground } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { addFriend, deleteRequest, deletePendingRequest, deleteFriend, requestUs
 import CheckedPost from '../assets/checked-post-sent.svg';
 import colors from '../theme/colors';
 import fonts from '../theme/fonts';
+import axios from 'axios';
 
 const ProfileScreen = ({ route, navigation }) => {
   const { userID, status } = route.params;
@@ -19,72 +20,34 @@ const ProfileScreen = ({ route, navigation }) => {
   const windowWidth = Dimensions.get('window').width;
   const unsubscribeRef = useRef();
 
-  function fetchProfile() {
-    let unsubscribeProfile = () => { };
+  const fetchProfile = async () => {
 
     try {
-      const userProfileRef = doc(FIRESTORE_DB, 'Users', userID);
+      const response = await axios.get(`http://localhost:8800/api/users/${userID}`);
 
-      unsubscribeProfile = onSnapshot(userProfileRef, (userSnap) => {
-        if (userSnap.exists()) {
-          setUserProfile({ id: userSnap.id, ...userSnap.data() });
-        }
-        else {
-          setUserProfile(null);
-        }
-      })
-      return unsubscribeProfile;
+      if (response.data.success) {
+        setUserProfile(response.data.body[0]);
+        setFriendStatus(response.data.friendStatus);
+      }
+      
 
     } catch (error) {
-      console.error("Error fetching posts: ", error);
+      console.error("Error fetching profile: ", error);
     }
   }
 
-  function fetchPosts() {
-    let unsubscribePosts = () => { };
-
+  const fetchPosts = async () => {
     try {
-      const postsRef = collection(FIRESTORE_DB, 'Posts');
-
-      const q = query(postsRef, where("userId", "==", userID), where("hidden", "==", false), orderBy("timePosted", "desc"));
-      unsubscribePosts = onSnapshot(q, (querySnapshot) => {
-        const postsArray = [];
-        querySnapshot.forEach((doc) => {
-          postsArray.push({ id: doc.id, ...doc.data() });
-        });
-        setPosts(postsArray);
-      })
-      return unsubscribePosts;
-
+      const response = await axios.get(`http://localhost:8800/api/users/${userID}/posts`);
+      setFriendStatus(response.data.friendStatus);
+      setPosts(response.data.body);
     } catch (error) {
       console.error("Error fetching posts:", error);
     }
   }
 
   useEffect(() => {
-    let unsubscribeProfile;
-    let unsubscribePosts;
-    (async () => {
-      let tempFriendStatus;
-      if (status === "unknown") {
-        tempFriendStatus = await findStatus(userID);
-        setFriendStatus(tempFriendStatus);
-      }
-      else {
-        setFriendStatus(status);
-        tempFriendStatus = status;
-      }
-      unsubscribeProfile = fetchProfile();
-
-      if (tempFriendStatus == "currentUser" || tempFriendStatus == "friend") {
-        unsubscribePosts = fetchPosts();
-      }
-
-    })();
-    unsubscribeRef.current = [unsubscribeProfile, unsubscribePosts].filter(Boolean);
-    return () => {
-      unsubscribeRef.current.forEach(unsub => unsub());
-    };
+    fetchProfile();
   }, []);
 
   useEffect(() => {
@@ -162,16 +125,16 @@ const ProfileScreen = ({ route, navigation }) => {
               </View>
             </View>)}
             <View style={styles.upperProfileContainer}>
-              <Image source={{ uri: userProfile.profilePic }} style={{ width: 100, height: 100, borderRadius: 50 }} />
+              <Image source={{ uri: userProfile.profile_pic ? userProfile.profile_pic : "https://firebasestorage.googleapis.com/v0/b/doozy-3d54c.appspot.com/o/profilePics%2Fdefault.jpg?alt=media&token=c4b20aae-830c-4d47-aa90-2a3ebd6e16fb" }} style={{ width: 100, height: 100, borderRadius: 50 }} />
               <View style={[styles.dataButtonContainer, { width: windowWidth - 100 - 30 }]}>
                 <View style={styles.dataContainer}>
                   <TouchableOpacity onPress={goToFriendsScreen} style={styles.data}>
-                    <Text style={styles.dataStat}>{userProfile.friends}</Text>
+                    <Text style={styles.dataStat}>{userProfile.friend_count}</Text>
                     <Text style={styles.dataText}>Friends</Text>
                   </TouchableOpacity>
                   <View style={styles.divider} />
                   <View style={styles.data}>
-                    <Text style={styles.dataStat}>{userProfile.posts}</Text>
+                    <Text style={styles.dataStat}>{userProfile.post_count}</Text>
                     <Text style={styles.dataText}>Posts</Text>
                   </View>
                 </View>
@@ -222,7 +185,7 @@ const ProfileScreen = ({ route, navigation }) => {
               {posts.length > 0 ? (
                 posts.map((post, index) => (
                   <TouchableOpacity
-                    key={post.id}
+                    key={post.post_id}
                     onPress={() => handlePostPress(index)}
                     style={[
                       styles.item,
@@ -234,7 +197,7 @@ const ProfileScreen = ({ route, navigation }) => {
                       <View style={styles.postInfoContainer}>
                         <View style={styles.postNameContainer}>
                           <CheckedPost width={32} height={32} />
-                          <Text style={styles.postName}>{post.postName}</Text>
+                          <Text style={styles.postName}>{post.post_name}</Text>
                         </View>
                       </View>
                       {post.image && (

@@ -1,8 +1,9 @@
-import { getUsersFromDB } from '../services/users.js';
+import { getUserFromDB } from '../services/users.js';
 
-export const getUsers = async (req, res) => {
+export const getUser = async (req, res) => {
     try {
-        const response = await getUsersFromDB();
+        const userId = Number(req.params.user_id);
+        const response = await getUserFromDB(userId);
         res.status(200).json(response);
     } catch (error) {
         console.error('Database error:', error);

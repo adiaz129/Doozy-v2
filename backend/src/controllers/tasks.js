@@ -20,14 +20,8 @@ export const postTask = async (req, res) => {
 export const getTasks = async (req, res) => {
     try {
         const userId = req.user.uid;
-        const listId = req.query.listId;
-        let response;
-        if (listId) {
-            response = await getTasksByListIdFromDB(listId, userId);
-        }
-        else {
-            response = await getAllTasksFromDB(userId);
-        }
+        
+        const response = await getAllTasksFromDB(userId);
         
         if (response.success) {
             return res.status(200).json(response);
