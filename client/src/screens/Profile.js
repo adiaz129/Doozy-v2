@@ -9,86 +9,54 @@ import { addFriend, deleteRequest, deletePendingRequest, deleteFriend, requestUs
 import CheckedPost from '../assets/checked-post-sent.svg';
 import colors from '../theme/colors';
 import fonts from '../theme/fonts';
+import axios from 'axios';
 
 const ProfileScreen = ({ route, navigation }) => {
-  const { userID, status } = route.params;
+  const { userID, setProfiles, setReqFriends } = route.params;
   const routes = useNavigationState(state => state.routes)
   const [userProfile, setUserProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [friendStatus, setFriendStatus] = useState(null);
   const windowWidth = Dimensions.get('window').width;
-  const unsubscribeRef = useRef();
 
-  function fetchProfile() {
-    let unsubscribeProfile = () => { };
-
+  const fetchProfile = async ()  => {
     try {
-      const userProfileRef = doc(FIRESTORE_DB, 'Users', userID);
-
-      unsubscribeProfile = onSnapshot(userProfileRef, (userSnap) => {
-        if (userSnap.exists()) {
-          setUserProfile({ id: userSnap.id, ...userSnap.data() });
-        }
-        else {
-          setUserProfile(null);
-        }
-      })
-      return unsubscribeProfile;
+      const response = await axios.get(`http://localhost:8800/api/users/${userID}`);
+      setUserProfile(response.data.body[0]);
 
     } catch (error) {
       console.error("Error fetching posts: ", error);
     }
   }
 
-  function fetchPosts() {
-    let unsubscribePosts = () => { };
-
+  const fetchPosts = async () => {
     try {
-      const postsRef = collection(FIRESTORE_DB, 'Posts');
-
-      const q = query(postsRef, where("userId", "==", userID), where("hidden", "==", false), orderBy("timePosted", "desc"));
-      unsubscribePosts = onSnapshot(q, (querySnapshot) => {
-        const postsArray = [];
-        querySnapshot.forEach((doc) => {
-          postsArray.push({ id: doc.id, ...doc.data() });
-        });
-        setPosts(postsArray);
-      })
-      return unsubscribePosts;
-
+      const response = await axios.get(`http://localhost:8800/api/users/${userID}/posts`);
+      setFriendStatus(response.data.friendStatus);
+      setPosts(response.data.body);
     } catch (error) {
-      console.error("Error fetching posts:", error);
+      if (error.status == 403) {
+        setFriendStatus(error.response.data.friendStatus);
+      }
+      else {
+        console.error("Error fetching posts:", error);
+      }
     }
   }
 
   useEffect(() => {
-    let unsubscribeProfile;
-    let unsubscribePosts;
-    (async () => {
-      let tempFriendStatus;
-      if (status === "unknown") {
-        tempFriendStatus = await findStatus(userID);
-        setFriendStatus(tempFriendStatus);
-      }
-      else {
-        setFriendStatus(status);
-        tempFriendStatus = status;
-      }
-      unsubscribeProfile = fetchProfile();
-
-      if (tempFriendStatus == "currentUser" || tempFriendStatus == "friend") {
-        unsubscribePosts = fetchPosts();
-      }
-
-    })();
-    unsubscribeRef.current = [unsubscribeProfile, unsubscribePosts].filter(Boolean);
-    return () => {
-      unsubscribeRef.current.forEach(unsub => unsub());
-    };
+    const fetchAllProfileData = async () => {
+      await fetchProfile();
+      await fetchPosts();
+    }
+    fetchAllProfileData();
   }, []);
 
   useEffect(() => {
-    fetchPosts();
+    const fetchOnlyPosts = async () => {
+      await fetchPosts();
+    }
+    fetchOnlyPosts();
   }, [friendStatus])
 
   const goToSettingsScreen = () => {
@@ -103,22 +71,60 @@ const ProfileScreen = ({ route, navigation }) => {
     navigation.navigate('AddFriends');
   };
 
-  const handleStatusChange = () => {
+  const handleStatusChange = async () => {
+    let result;
     if (friendStatus == "currentUser") {
       navigation.navigate("EditProfile", { user: userProfile });
     }
     else if (friendStatus == "friend") {
-      deleteFriend(userProfile);
-      setFriendStatus("stranger");
+      result = await deleteFriend(userProfile.user_id);
+      if (result) {
+        setFriendStatus(result);
+      }
     }
     else if (friendStatus == "stranger") {
-      requestUser(userProfile);
-      setFriendStatus("userSentRequest") // i should check if there was an error
+      result = await requestUser(userProfile.user_id);
+      if (result) {
+        setFriendStatus(result);
+      }
     }
     else {
-      deletePendingRequest(userProfile);
-      setFriendStatus("stranger")
+      result = await deletePendingRequest(userProfile.user_id);
+      if (result) {
+        setFriendStatus(result);
+      }
     }
+    if (setProfiles) {
+        setProfiles(prev => prev.map(item => item.user_id === userProfile.user_id ? {...item, friendStatus: result} : item));      
+      }
+  }
+
+  const deleteRequestHelper = async () => {
+    const result = await deleteRequest(userProfile.user_id);
+    if (result) {
+      setFriendStatus(result);
+      if (setReqFriends) {
+        setReqFriends(prev => prev.filter(item => item.user_id !== userProfile.user_id));
+      }
+      if (setProfiles) {
+        setProfiles(prev => prev.map(item => item.user_id === userProfile.user_id ? {...item, friendStatus: result} : item));      
+      }
+    }
+  }
+
+
+  const addFriendHelper = async () => {
+    const result = await addFriend(userProfile.user_id);
+    if (result) {
+      setFriendStatus(result);
+      if (setReqFriends) {
+        setReqFriends(prev => prev.filter(item => item.user_id !== userProfile.user_id));
+      }
+      if (setProfiles) {
+        setProfiles(prev => prev.map(item => item.user_id === userProfile.user_id ? {...item, friendStatus: result} : item));      
+      }
+    }
+    
   }
 
   const handlePostPress = (index) => {
@@ -153,25 +159,25 @@ const ProfileScreen = ({ route, navigation }) => {
             {friendStatus == "userReceivedRequest" && (<View style={styles.friendRequest}>
               <Text style={styles.detailText}>{userProfile.username} wants to be friends</Text>
               <View style={{ flexDirection: 'row', width: '60%' }}>
-                <TouchableOpacity style={styles.deleteButton} onPress={() => { deleteRequest(userProfile); setFriendStatus("stranger") }}>
+                <TouchableOpacity style={styles.deleteButton} onPress={async () => (await deleteRequestHelper())}>
                   <Text style={styles.buttonText}>Delete</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} onPress={() => { addFriend(userProfile); setFriendStatus("friend") }}>
+                <TouchableOpacity style={styles.confirmButton} onPress={async () => {await addFriendHelper()}}>
                   <Text style={styles.buttonText}>Confirm</Text>
                 </TouchableOpacity>
               </View>
             </View>)}
             <View style={styles.upperProfileContainer}>
-              <Image source={{ uri: userProfile.profilePic }} style={{ width: 100, height: 100, borderRadius: 50 }} />
+              <Image source={{ uri: userProfile.profile_pic }} style={{ width: 100, height: 100, borderRadius: 50 }} />
               <View style={[styles.dataButtonContainer, { width: windowWidth - 100 - 30 }]}>
                 <View style={styles.dataContainer}>
                   <TouchableOpacity onPress={goToFriendsScreen} style={styles.data}>
-                    <Text style={styles.dataStat}>{userProfile.friends}</Text>
+                    <Text style={styles.dataStat}>{userProfile.friend_count}</Text>
                     <Text style={styles.dataText}>Friends</Text>
                   </TouchableOpacity>
                   <View style={styles.divider} />
                   <View style={styles.data}>
-                    <Text style={styles.dataStat}>{userProfile.posts}</Text>
+                    <Text style={styles.dataStat}>{userProfile.post_count}</Text>
                     <Text style={styles.dataText}>Posts</Text>
                   </View>
                 </View>
@@ -222,7 +228,7 @@ const ProfileScreen = ({ route, navigation }) => {
               {posts.length > 0 ? (
                 posts.map((post, index) => (
                   <TouchableOpacity
-                    key={post.id}
+                    key={post.post_id}
                     onPress={() => handlePostPress(index)}
                     style={[
                       styles.item,
@@ -234,7 +240,7 @@ const ProfileScreen = ({ route, navigation }) => {
                       <View style={styles.postInfoContainer}>
                         <View style={styles.postNameContainer}>
                           <CheckedPost width={32} height={32} />
-                          <Text style={styles.postName}>{post.postName}</Text>
+                          <Text style={styles.postName}>{post.post_name}</Text>
                         </View>
                       </View>
                       {post.image && (

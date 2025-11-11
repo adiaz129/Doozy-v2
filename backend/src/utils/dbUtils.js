@@ -8,7 +8,7 @@ const usersQuery = `CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(30) NOT NULL UNIQUE,
     username_lower VARCHAR(30) NOT NULL UNIQUE,
     bio VARCHAR(150) DEFAULT NULL,
-    profile_pic VARCHAR(255),
+    profile_pic VARCHAR(255) DEFAULT NULL,
     post_count INT NOT NULL DEFAULT 0,
     task_count INT NOT NULL DEFAULT 0,
     friend_count INT NOT NULL DEFAULT 0
@@ -72,6 +72,24 @@ const postsQuery = `CREATE TABLE IF NOT EXISTS posts (
     comment_count INT NOT NULL DEFAULT 0
 )`
 
+const friendsQuery = `CREATE TABLE IF NOT EXISTS friends (
+  user_id1 int NOT NULL,
+  user_id2 int NOT NULL,
+  PRIMARY KEY (user_id1, user_id2),
+  FOREIGN KEY (user_id1) REFERENCES users(user_id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id2) REFERENCES users(user_id) ON DELETE CASCADE,
+  CONSTRAINT chk_user_order CHECK (user_id1 < user_id2)
+);`
+
+const requestsQuery = `CREATE TABLE IF NOT EXISTS requests (
+  requesting_id int NOT NULL,
+  receiving_id int NOT NULL,
+  created_at timestamp NOT NULL DEFAULT (utc_timestamp()),
+  PRIMARY KEY (requesting_id, receiving_id),
+  FOREIGN KEY (requesting_id) REFERENCES users(user_id) ON DELETE CASCADE,
+  FOREIGN KEY (receiving_id) REFERENCES users(user_id) ON DELETE CASCADE
+);`
+
 
 
 //make 
@@ -94,6 +112,8 @@ const createAllTables = async () => {
         await createTable('reminders', remindersQuery);
         await createTable('notifications', notificationsQuery);
         await createTable('posts', postsQuery);
+        await createTable('friends', friendsQuery);
+        await createTable('requests', requestsQuery);
     } catch (error) {
         console.log("Error creating tables", error);
     }
