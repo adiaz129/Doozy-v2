@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FIRESTORE_DB } from '../../firebaseConfig';
+import { FIREBASE_AUTH, FIRESTORE_DB } from '../../firebaseConfig';
 import { doc, getDoc, collection, getDocs, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image, ScrollView, ImageBackground } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,27 +12,20 @@ import fonts from '../theme/fonts';
 import axios from 'axios';
 
 const ProfileScreen = ({ route, navigation }) => {
-  const { userID, status } = route.params;
+  const { userID, setProfiles, setReqFriends } = route.params;
   const routes = useNavigationState(state => state.routes)
   const [userProfile, setUserProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [friendStatus, setFriendStatus] = useState(null);
   const windowWidth = Dimensions.get('window').width;
-  const unsubscribeRef = useRef();
 
-  const fetchProfile = async () => {
-
+  const fetchProfile = async ()  => {
     try {
       const response = await axios.get(`http://localhost:8800/api/users/${userID}`);
-
-      if (response.data.success) {
-        setUserProfile(response.data.body[0]);
-        setFriendStatus(response.data.friendStatus);
-      }
-      
+      setUserProfile(response.data.body[0]);
 
     } catch (error) {
-      console.error("Error fetching profile: ", error);
+      console.error("Error fetching posts: ", error);
     }
   }
 
@@ -42,16 +35,28 @@ const ProfileScreen = ({ route, navigation }) => {
       setFriendStatus(response.data.friendStatus);
       setPosts(response.data.body);
     } catch (error) {
-      console.error("Error fetching posts:", error);
+      if (error.status == 403) {
+        setFriendStatus(error.response.data.friendStatus);
+      }
+      else {
+        console.error("Error fetching posts:", error);
+      }
     }
   }
 
   useEffect(() => {
-    fetchProfile();
+    const fetchAllProfileData = async () => {
+      await fetchProfile();
+      await fetchPosts();
+    }
+    fetchAllProfileData();
   }, []);
 
   useEffect(() => {
-    fetchPosts();
+    const fetchOnlyPosts = async () => {
+      await fetchPosts();
+    }
+    fetchOnlyPosts();
   }, [friendStatus])
 
   const goToSettingsScreen = () => {
@@ -66,22 +71,60 @@ const ProfileScreen = ({ route, navigation }) => {
     navigation.navigate('AddFriends');
   };
 
-  const handleStatusChange = () => {
+  const handleStatusChange = async () => {
+    let result;
     if (friendStatus == "currentUser") {
       navigation.navigate("EditProfile", { user: userProfile });
     }
     else if (friendStatus == "friend") {
-      deleteFriend(userProfile);
-      setFriendStatus("stranger");
+      result = await deleteFriend(userProfile.user_id);
+      if (result) {
+        setFriendStatus(result);
+      }
     }
     else if (friendStatus == "stranger") {
-      requestUser(userProfile);
-      setFriendStatus("userSentRequest") // i should check if there was an error
+      result = await requestUser(userProfile.user_id);
+      if (result) {
+        setFriendStatus(result);
+      }
     }
     else {
-      deletePendingRequest(userProfile);
-      setFriendStatus("stranger")
+      result = await deletePendingRequest(userProfile.user_id);
+      if (result) {
+        setFriendStatus(result);
+      }
     }
+    if (setProfiles) {
+        setProfiles(prev => prev.map(item => item.user_id === userProfile.user_id ? {...item, friendStatus: result} : item));      
+      }
+  }
+
+  const deleteRequestHelper = async () => {
+    const result = await deleteRequest(userProfile.user_id);
+    if (result) {
+      setFriendStatus(result);
+      if (setReqFriends) {
+        setReqFriends(prev => prev.filter(item => item.user_id !== userProfile.user_id));
+      }
+      if (setProfiles) {
+        setProfiles(prev => prev.map(item => item.user_id === userProfile.user_id ? {...item, friendStatus: result} : item));      
+      }
+    }
+  }
+
+
+  const addFriendHelper = async () => {
+    const result = await addFriend(userProfile.user_id);
+    if (result) {
+      setFriendStatus(result);
+      if (setReqFriends) {
+        setReqFriends(prev => prev.filter(item => item.user_id !== userProfile.user_id));
+      }
+      if (setProfiles) {
+        setProfiles(prev => prev.map(item => item.user_id === userProfile.user_id ? {...item, friendStatus: result} : item));      
+      }
+    }
+    
   }
 
   const handlePostPress = (index) => {
@@ -116,16 +159,16 @@ const ProfileScreen = ({ route, navigation }) => {
             {friendStatus == "userReceivedRequest" && (<View style={styles.friendRequest}>
               <Text style={styles.detailText}>{userProfile.username} wants to be friends</Text>
               <View style={{ flexDirection: 'row', width: '60%' }}>
-                <TouchableOpacity style={styles.deleteButton} onPress={() => { deleteRequest(userProfile); setFriendStatus("stranger") }}>
+                <TouchableOpacity style={styles.deleteButton} onPress={async () => (await deleteRequestHelper())}>
                   <Text style={styles.buttonText}>Delete</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} onPress={() => { addFriend(userProfile); setFriendStatus("friend") }}>
+                <TouchableOpacity style={styles.confirmButton} onPress={async () => {await addFriendHelper()}}>
                   <Text style={styles.buttonText}>Confirm</Text>
                 </TouchableOpacity>
               </View>
             </View>)}
             <View style={styles.upperProfileContainer}>
-              <Image source={{ uri: userProfile.profile_pic ? userProfile.profile_pic : "https://firebasestorage.googleapis.com/v0/b/doozy-3d54c.appspot.com/o/profilePics%2Fdefault.jpg?alt=media&token=c4b20aae-830c-4d47-aa90-2a3ebd6e16fb" }} style={{ width: 100, height: 100, borderRadius: 50 }} />
+              <Image source={{ uri: userProfile.profile_pic }} style={{ width: 100, height: 100, borderRadius: 50 }} />
               <View style={[styles.dataButtonContainer, { width: windowWidth - 100 - 30 }]}>
                 <View style={styles.dataContainer}>
                   <TouchableOpacity onPress={goToFriendsScreen} style={styles.data}>

@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, use } from 'react';
 import { View, Text, Image, FlatList, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addFriend, deleteRequest, deletePendingRequest, deleteFriend, requestUser, fetchFriends, fetchRequests, fetchRequesting, fetchProfiles } from '../utils/friendFunctions'
+import { addFriend, deleteRequest, deletePendingRequest, deleteFriend, requestUser, fetchFriends, fetchRequests, fetchProfiles } from '../utils/friendFunctions'
 import { Ionicons } from '@expo/vector-icons';
-import { FIREBASE_AUTH } from '../../firebaseConfig';
 import colors from '../theme/colors';
 import fonts from '../theme/fonts';
+import axios from 'axios';
 
 const AddFriendsScreen = ({ navigation }) => {
 
@@ -15,80 +15,89 @@ const AddFriendsScreen = ({ navigation }) => {
     const [profiles, setProfiles] = useState([]);
     const [searchProfilesText, setSearchProfilesText] = useState("");
     const unsubscribeRef = useRef([]);
-    const currentUser = FIREBASE_AUTH.currentUser;
-
-    const filteredProfiles = profiles.filter((profile) => {
-        return profile.name.toLowerCase().startsWith(searchProfilesText.toLowerCase())
-            || profile.username.toLowerCase().startsWith(searchProfilesText.toLowerCase())
-    });
 
     useEffect(() => {
-
-        const unsubscribeFriends = fetchFriends(setFriends, currentUser.uid);
-        const unsubscribeRequests = fetchRequests(setReqFriends);
-        const unsubscribeRequesting = fetchRequesting(setRequesting);
-
-        unsubscribeRef.current = [unsubscribeFriends, unsubscribeRequests, unsubscribeRequesting];
-
-        return () => {
-            unsubscribeRef.current.forEach(unsub => unsub());
-        };
-
-    }, []);
+        fetchReqData = async () => {
+            setReqFriends(await fetchRequests());
+        }
+        fetchReqData();
+    }, [])
 
     useEffect(() => {
-
-        const unsubscribeProfiles = fetchProfiles(friends, setProfiles);
-
-        return () => unsubscribeProfiles();
-
-    }, [friends, reqFriends, requesting]);
-
-    const renderProfileCard = ({ item }) => {
-        let status;
-        const reqFriendsIds = reqFriends.map(data => data.id);
-        if (reqFriendsIds.includes(item.id)) {
-            status = "userReceivedRequest"; //requested
+        if (!searchProfilesText) {
+            setProfiles([])
         }
-        else if (requesting.some(obj => obj.id === item.id)) {
-            status = "userSentRequest"; //requesting
-        }
-        else {
-            status = "stranger";
-        }
-        return <ProfileCard item={item} status={status} />
-    };
+        const searchDelay = setTimeout(async () => {
+            if (searchProfilesText) {
+                await searchProfiles(searchProfilesText);
+            }
+        }, 300);
 
+        return () => clearTimeout(searchDelay);
+    }, [searchProfilesText]);
 
-    const ProfileCard = ({ item, status }) => (
-        <TouchableOpacity onPress={() => { navigation.navigate('Profile', { userID: item.id, status: status }) }} style={styles.profileCard}>
+    const searchProfiles = async (query) => {
+        const response = await axios.get(`http://localhost:8800/api/users/search?q=${query}`);
+        setProfiles(response.data.body);
+    }
+
+    const deleteRequestHelper = async (userId) => {
+        const result = await deleteRequest(userId);
+        if (result) {
+            setReqFriends(prev => prev.filter(item => item.user_id !== userId))
+        }
+    }
+
+    const addFriendHelper = async (userId) => {
+        const result = await addFriend(userId);
+        if (result) {
+            setReqFriends(prev => prev.filter(item => item.user_id !== userId));
+        }
+    }
+
+    const requestUserHelper = async (userId) => {
+        const result = await requestUser(userId);
+        if (result) {
+            setProfiles(prev => prev.map(item => item.user_id === userId ? {...item, friendStatus: result} : item));
+        }
+    }
+
+    const deletePendingRequestHelper = async (userId) => {
+        const result = await deletePendingRequest(userId);
+        if (result) {
+            setProfiles(prev => prev.map(item => item.user_id === userId ? {...item, friendStatus: result} : item));
+        }
+    }
+
+    const ProfileCard = ({ item }) => (
+        <TouchableOpacity onPress={() => { navigation.navigate('Profile', { userID: item.user_id, setProfiles: setProfiles, setReqFriends: setReqFriends }) }} style={styles.profileCard}>
             <View style={styles.userInfo}>
-                <Image source={{ uri: item.profilePic }} style={styles.profilePic} />
+                <Image source={{ uri: item.profile_pic }} style={styles.profilePic} />
                 <View style={styles.profileCardNames}>
                     <Text style={styles.nameText}> {item.name} </Text>
-                    <Text style={styles.usernameText}> {status === "userReceivedRequest" ? "wants to be friends" : item.username} </Text>
+                    <Text style={styles.usernameText}> {item.friendStatus === "userReceivedRequest" ? "wants to be friends" : item.username} </Text>
                 </View>
             </View>
-            {status === "userReceivedRequest" &&
+            {item.friendStatus === "userReceivedRequest" &&
                 (<View style={styles.requestConfirmationButtons}>
-                    <TouchableOpacity style={styles.deleteButton} onPress={() => { deleteRequest(item) }}>
+                    <TouchableOpacity style={styles.deleteButton} onPress={async () => { await deleteRequestHelper(item.user_id) }}>
                         <Text style={styles.deleteButtonText}>Delete</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.confirmButton} onPress={() => { addFriend(item) }}>
+                    <TouchableOpacity style={styles.confirmButton} onPress={async () => { await addFriendHelper(item.user_id) }}>
                         <Text style={styles.confirmButtonText}>Confirm</Text>
                     </TouchableOpacity>
                 </View>
                 )}
-            {status === "userSentRequest" &&
+            {item.friendStatus === "userSentRequest" &&
                 (<View style={styles.requestConfirmationButtons}>
-                    <TouchableOpacity style={styles.requestedButton} onPress={() => { deletePendingRequest(item) }}>
+                    <TouchableOpacity style={styles.requestedButton} onPress={async () => { await deletePendingRequestHelper(item.user_id) }}>
                         <Text style={styles.confirmButtonText}>Requested</Text>
                     </TouchableOpacity>
                 </View>
                 )}
-            {status === "stranger" &&
+            {item.friendStatus === "stranger" &&
                 (<View style={styles.requestConfirmationButtons}>
-                    <TouchableOpacity onPress={() => { requestUser(item)}} style={{padding: 5}}>
+                    <TouchableOpacity onPress={async () => { await requestUserHelper(item.user_id)}} style={{padding: 5}}>
                         <Ionicons name={"person-add"} size={26} color={colors.primary} />
                     </TouchableOpacity>
                 </View>
@@ -116,17 +125,17 @@ const AddFriendsScreen = ({ navigation }) => {
                     <View style={styles.profileCardContainer}>
                         <FlatList
                             data={reqFriends}
-                            renderItem={renderProfileCard}
-                            keyExtractor={(item) => item.id}
+                            renderItem={ProfileCard}
+                            keyExtractor={(item) => item.user_id}
                             keyboardShouldPersistTaps="handled" />
                     </View>)}
                 {searchProfilesText !== "" &&
                     (
                         <View style={styles.profileCardContainer}>
                             <FlatList
-                                data={filteredProfiles}
-                                renderItem={renderProfileCard}
-                                keyExtractor={(item) => item.id} 
+                                data={profiles}
+                                renderItem={ProfileCard}
+                                keyExtractor={(item) => item.user_id} 
                                 keyboardShouldPersistTaps="handled"/>
                         </View>)}
             </View>

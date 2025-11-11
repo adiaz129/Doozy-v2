@@ -2,28 +2,108 @@ import { pool } from "../config/db.js";
 
 export const checkFriendStatusInDB = async (currUser, fetchingUser) => {
     try {
-        const q1 = `SELECT COUNT(*) FROM friends WHERE user_id1 = LEAST(?, ?) AND user_id2 = GREATEST(?, ?);`;
+        const q1 = `SELECT COUNT(*) AS isFriend FROM friends WHERE user_id1 = LEAST(?, ?) AND user_id2 = GREATEST(?, ?);`;
         const values1 = [currUser, fetchingUser, currUser, fetchingUser];
         const [result1] = await pool.query(q1, values1);
-        if (result1 > 0) {
-            return {success: true, friendStatus: "friends"};
+        if (result1[0].isFriend > 0) {
+            return {success: true, friendStatus: "friend"};
         }
 
-        const q2 = `SELECT COUNT(*) FROM requests WHERE requesting_id = ? AND receiving_id = ?;`;
+        const q2 = `SELECT COUNT(*) AS isRequesting FROM requests WHERE requesting_id = ? AND receiving_id = ?;`;
         const values2 = [currUser, fetchingUser];
         const [result2] = await pool.query(q2, values2);
-        if (result2 > 0) {
+        if (result2[0].isRequesting > 0) {
             return {success: true, friendStatus: "userSentRequest"};
         }
 
         const values3 = [fetchingUser, currUser];
         const [result3] = await pool.query(q2, values3);
-        if (result3 > 0) {
+        if (result3[0].isRequesting > 0) {
             return {success: true, friendStatus: "userReceivedRequest"};
         }
 
         return {success: true, friendStatus: "stranger"}
     } catch (error) {
+        console.error(error)
         return {success: false}
+    }
+}
+
+export const requestFriendInDB = async (requestingId, receivingId) => {
+    try {
+        const q = `INSERT INTO requests (requesting_id, receiving_id) VALUES (?, ?);`;
+        const values = [requestingId, receivingId];
+        const [result] = await pool.query(q, values);
+        
+        return { success: true, message: 'Successful friend request.' };
+    } catch (error) {
+        console.log(error)
+        return { success: false, message: 'Failed friend request.' };
+    }
+}
+
+export const deleteFriendRequestInDB = async (requestingId, receivingId) => {
+    try {
+        const q = `DELETE FROM requests WHERE requesting_id = ? AND receiving_id = ?;`;
+        const values = [requestingId, receivingId];
+        const [result] = await pool.query(q, values);
+
+        return { success: true, message: 'Successful friend request deletion.' };
+    } catch (error) {
+        console.log(error)
+        return { success: false, message: 'Failed friend request deletion.' };
+    }
+}
+
+export const addFriendInDB = async (requestingId, receivingId) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        const q1 = `DELETE FROM requests WHERE requesting_id = ? AND receiving_id = ?;`;
+        const values1 = [requestingId, receivingId];
+        const [result1] = await connection.query(q1, values1);
+
+        const q2 = `INSERT INTO friends (user_id1, user_id2) VALUES (?, ?);`;
+        const values2 = [Math.min(requestingId, receivingId), Math.max(requestingId, receivingId)];
+        const [result2] = await connection.query(q2, values2);
+
+        await connection.commit();
+        return { success: true, message: 'Successful adding friend.' };
+    } catch (error) {
+        console.log(error)
+        return { success: false, message: 'Failed adding friend.'};
+    } finally {
+        connection.release();
+    }
+}
+
+export const deleteFriendInDB = async (friend1, friend2) => {
+    try {
+        const q = `DELETE FROM friends WHERE user_id1 = ? AND user_id2 = ?;`;
+        const values = [Math.min(friend1, friend2), Math.max(friend1, friend2)];
+        const [result] = await pool.query(q, values);
+
+        return { success: true, message: 'Successful friend deletion.' };
+    } catch (error) {
+        console.log(error)
+        return { success: false, message: 'Failed friend deletion.' };
+    }
+}
+
+export const getIncomingFriendRequestsFromDB = async (userId) => {
+    try {
+        const q = `SELECT u.user_id, u.name, u.username, u.profile_pic, r.created_at
+                    FROM users u
+                    INNER JOIN requests r ON r.requesting_id = u.user_id AND r.receiving_id = ?
+                    ORDER BY r.created_at DESC;`;
+        const [result] = await pool.query(q, [userId]);
+        const updatedResult = result.map(item => ({
+            ...item,
+            friendStatus: 'userReceivedRequest'
+        }));
+
+        return { success: true, message: 'Successful retrieving friend requests.', body: updatedResult};
+    } catch (error) {
+        return { success: false, message: 'Failed to retrieve friend requests.'};
     }
 }
