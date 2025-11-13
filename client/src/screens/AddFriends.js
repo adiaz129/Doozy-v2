@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef, use } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, Image, FlatList, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addFriend, deleteRequest, deletePendingRequest, deleteFriend, requestUser, fetchFriends, fetchRequests, fetchProfiles } from '../utils/friendFunctions'
@@ -22,6 +23,20 @@ const AddFriendsScreen = ({ navigation }) => {
         }
         fetchReqData();
     }, [])
+
+    useFocusEffect(
+        useCallback(() => {
+            const backToScreen = async () => {
+                if (searchProfilesText) {
+                    await searchProfiles(searchProfilesText);
+                }
+                else {
+                    setReqFriends(await fetchRequests());
+                }
+            }
+            backToScreen();
+        }, [])
+    );
 
     useEffect(() => {
         if (!searchProfilesText) {

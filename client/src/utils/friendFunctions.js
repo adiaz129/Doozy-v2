@@ -70,21 +70,13 @@ export const requestUser = async (userId) => { // update currentusers requesting
     }
 }
 
-export function fetchFriends(setFriends, userID) { //setFriends
+export const fetchFriends = async (userID) => { 
     try {
-        const AllFriendsRef = collection(FIRESTORE_DB, 'Requests', userID, 'AllFriends');
-
-        const unsubscribeFriends = onSnapshot(AllFriendsRef,
-            (snapshot) => {
-                const tempFriends = [];
-                snapshot.forEach((doc) => {
-                    tempFriends.push({ id: doc.id, ...doc.data() });
-                });
-                setFriends(tempFriends);
-            });
-        return unsubscribeFriends;
+        const response = await axios.get(`http://localhost:8800/api/friends/${userID}`);
+        return response.data.body;
     } catch (error) {
         console.error("Error fetching friends:", error);
+        return [];
     }
 }
 

@@ -16,7 +16,7 @@ export const getUsersFromSearchFromDB = async (userId, searchQuery) => {
     try {
         const q = `SELECT u.user_id, u.name, u.username, u.profile_pic,
                     CASE
-                        WHEN f.user_id1 IS NOT NULL THEN 'friends'
+                        WHEN f.user_id1 IS NOT NULL THEN 'friend'
                         WHEN r.requesting_id = ? THEN 'userSentRequest'
                         WHEN r.receiving_id = ? THEN 'userReceivedRequest'
                         ELSE 'stranger'
@@ -27,7 +27,6 @@ export const getUsersFromSearchFromDB = async (userId, searchQuery) => {
                     WHERE (u.name LIKE CONCAT(?, '%') OR u.username LIKE CONCAT(?, '%')) AND u.user_id != ?;`;
         const values = [userId, userId, userId, userId, userId, userId, searchQuery, searchQuery, userId];
         const [result] = await pool.query(q, values);
-        console.log(result)
         return {success: true, message: 'Successful search query.', body: result};
     } catch (error) {
         console.log(error);

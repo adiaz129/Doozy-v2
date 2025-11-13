@@ -94,7 +94,7 @@ export const getIncomingFriendRequestsFromDB = async (userId) => {
     try {
         const q = `SELECT u.user_id, u.name, u.username, u.profile_pic, r.created_at
                     FROM users u
-                    INNER JOIN requests r ON r.requesting_id = u.user_id AND r.receiving_id = ?
+                    JOIN requests r ON r.requesting_id = u.user_id AND r.receiving_id = ?
                     ORDER BY r.created_at DESC;`;
         const [result] = await pool.query(q, [userId]);
         const updatedResult = result.map(item => ({
@@ -105,5 +105,21 @@ export const getIncomingFriendRequestsFromDB = async (userId) => {
         return { success: true, message: 'Successful retrieving friend requests.', body: updatedResult};
     } catch (error) {
         return { success: false, message: 'Failed to retrieve friend requests.'};
+    }
+}
+
+export const getAllFriendsFromDB = async (userId) => {
+    try {
+        const q = `SELECT u.user_id, u.name, u.username, u.profile_pic
+                    FROM users u
+                    JOIN friends f ON (f.user_id1 = u.user_id AND f.user_id2 = ?) 
+                        OR (f.user_id1 = ? AND f.user_id2 = u.user_id);`
+        const values = [userId, userId];
+        
+        const [result] = await pool.query(q, values);
+
+        return {success: true, message: "Successful retrieving friends.", body: result};
+    } catch (error) {
+        return error;
     }
 }

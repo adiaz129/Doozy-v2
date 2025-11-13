@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, Image, FlatList, StyleSheet, TouchableOpacity, TextInput, Modal, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { fetchFriends } from '../utils/friendFunctions'
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
 import fonts from '../theme/fonts';
-import { deleteFriend } from '../utils/friendFunctions';
+import { deleteFriend, fetchFriends } from '../utils/friendFunctions';
+import { AuthContext } from '../AuthContext';
 
 
 const FriendsScreen = ({ route, navigation }) => {
@@ -14,12 +15,22 @@ const FriendsScreen = ({ route, navigation }) => {
     const [isFriendMenuVisible, setFriendMenuVisible] = useState(false);
     const [selectedFriend, setSelectedFriend] = useState(null);
     const { userID } = route.params;
+    const { auth } = useContext(AuthContext);
+
+    useFocusEffect(
+        useCallback(() => {
+            const fetchFriendsHelper = async () => {
+                setFriends(await fetchFriends(userID));
+            }
+            fetchFriendsHelper();
+        }, [])
+    );
 
     useEffect(() => {
-        const unsubscribeFriends = fetchFriends(setFriends, userID);
-
-        return () => unsubscribeFriends()
-
+        const fetchFriendsHelper = async () => {
+            setFriends(await fetchFriends(userID));
+        }
+        fetchFriendsHelper();
     }, []);
 
 
@@ -27,11 +38,20 @@ const FriendsScreen = ({ route, navigation }) => {
         return friend.name.toLowerCase().startsWith(searchText.toLowerCase()) || friend.username.toLowerCase().startsWith(searchText.toLowerCase())
     });
 
+    const deleteFriendHelper = async () => {
+        const result = await deleteFriend(selectedFriend.user_id);
+        if (result !== "friend") {
+            setFriends(prev => prev.filter(item => item.user_id !== selectedFriend.user_id))
+        }
+        setFriendMenuVisible(false);
+        setSelectedFriend(null);
+    }
+
 
     const ProfileCard = ({ item }) => (
-        <TouchableOpacity onPress={() => { navigation.navigate('Profile', { userID: item.id, status: "unknown" }) }} style={styles.profileCard}>
+        <TouchableOpacity onPress={() => { navigation.navigate('Profile', { userID: item.user_id, setFriends: userID === auth.uid ? setFriends : null }) }} style={styles.profileCard}>
             <View style={styles.userInfo}>
-                <Image source={{ uri: item.profilePic }} style={styles.profilePic} />
+                <Image source={{ uri: item.profile_pic }} style={styles.profilePic} />
                 <View style={styles.profileCardNames}>
                     <Text style={styles.nameText}> {item.name} </Text>
                     <Text style={styles.usernameText}> {item.username} </Text>
@@ -54,10 +74,10 @@ const FriendsScreen = ({ route, navigation }) => {
                     <View style={{ flex: 1 }} />
                 </TouchableWithoutFeedback>
                 <SafeAreaView style={styles.modalContainer}>
-                    <TouchableOpacity onPress={() => {deleteFriend(selectedFriend); setFriendMenuVisible(false);}} style={styles.option}>
+                    <TouchableOpacity onPress={async () => {deleteFriendHelper()}} style={styles.option}>
                         <Text style={{ color: colors.primary, ...styles.text }}>Remove Friend</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => {navigation.navigate('Profile', { userID: selectedFriend.id, status: "unknown" }); setFriendMenuVisible(false);}} style={styles.option}>
+                    <TouchableOpacity onPress={() => {navigation.navigate('Profile', { userID: selectedFriend.user_id, setFriends: userID === auth.uid ? setFriends : null }); setFriendMenuVisible(false);}} style={styles.option}>
                         <Text style={{ color: colors.primary, ...styles.text }}>View Profile</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => setFriendMenuVisible(false)} style={styles.option}>
@@ -83,7 +103,7 @@ const FriendsScreen = ({ route, navigation }) => {
                     <FlatList
                         data={filteredFriends}
                         renderItem={({ item }) => (<ProfileCard item={item} />)}
-                        keyExtractor={(item) => item.id} 
+                        keyExtractor={(item) => item.user_id} 
                         keyboardShouldPersistTaps="handled" />
                 </View>
             </View>
