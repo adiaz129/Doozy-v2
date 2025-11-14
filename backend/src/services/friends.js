@@ -67,6 +67,12 @@ export const addFriendInDB = async (requestingId, receivingId) => {
         const values2 = [Math.min(requestingId, receivingId), Math.max(requestingId, receivingId)];
         const [result2] = await connection.query(q2, values2);
 
+        const q3 = `UPDATE users
+                    SET friend_count = friend_count + 1
+                    WHERE user_id = ? OR user_id = ?;`;
+        const values3 = [requestingId, receivingId];
+        const [result3] = await connection.query(q3, values3);
+
         await connection.commit();
         return { success: true, message: 'Successful adding friend.' };
     } catch (error) {
@@ -78,15 +84,26 @@ export const addFriendInDB = async (requestingId, receivingId) => {
 }
 
 export const deleteFriendInDB = async (friend1, friend2) => {
+    const connection = await pool.getConnection();
     try {
-        const q = `DELETE FROM friends WHERE user_id1 = ? AND user_id2 = ?;`;
-        const values = [Math.min(friend1, friend2), Math.max(friend1, friend2)];
-        const [result] = await pool.query(q, values);
+        await connection.beginTransaction();
+        const q1 = `DELETE FROM friends WHERE user_id1 = ? AND user_id2 = ?;`;
+        const values1 = [Math.min(friend1, friend2), Math.max(friend1, friend2)];
+        const [result1] = await connection.query(q1, values1);
 
+        const q2 = `UPDATE users
+                    SET friend_count = friend_count - 1
+                    WHERE user_id = ? OR user_id = ?;`;
+        const values2 = [friend1, friend2];
+        const [result2] = await connection.query(q2, values2);
+
+        await connection.commit();
         return { success: true, message: 'Successful friend deletion.' };
     } catch (error) {
         console.log(error)
         return { success: false, message: 'Failed friend deletion.' };
+    } finally {
+        connection.release();
     }
 }
 

@@ -90,6 +90,7 @@ const ProfileScreen = ({ route, navigation }) => {
       result = await deleteFriend(userProfile.user_id);
       if (result) {
         setFriendStatus(result);
+        setUserProfile(prev => ({...prev, friend_count: prev.friend_count - 1}));
         if (setFriends) {
           setFriends(prev => prev.filter(item => item.user_id !== userProfile.user_id));
         }
@@ -130,6 +131,7 @@ const ProfileScreen = ({ route, navigation }) => {
     const result = await addFriend(userProfile.user_id);
     if (result) {
       setFriendStatus(result);
+      setUserProfile(prev => ({...prev, friend_count: prev.friend_count + 1}));
       if (setReqFriends) {
         setReqFriends(prev => prev.filter(item => item.user_id !== userProfile.user_id));
       }
