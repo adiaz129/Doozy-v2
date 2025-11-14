@@ -1,6 +1,6 @@
 import express from 'express';
 import { checkFriendStatus } from '../middleware/friendStatus.js';
-import { requestFriend, deleteOutgoingFriendRequest, deleteIncomingFriendRequest, addFriend, deleteFriend, getIncomingFriendRequests } from '../controllers/friends.js';
+import { requestFriend, deleteOutgoingFriendRequest, deleteIncomingFriendRequest, addFriend, deleteFriend, getIncomingFriendRequests, getAllFriends } from '../controllers/friends.js';
 
 const router = express.Router();
 
@@ -10,5 +10,6 @@ router.delete('/request/outgoing/:user_id', checkFriendStatus, deleteOutgoingFri
 router.delete('/request/incoming/:user_id', checkFriendStatus, deleteIncomingFriendRequest);
 router.post('/:user_id', checkFriendStatus, addFriend);
 router.delete('/:user_id', checkFriendStatus, deleteFriend);
+router.get('/:user_id', getAllFriends)
 
 export default router;

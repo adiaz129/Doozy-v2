@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { FIREBASE_AUTH, FIRESTORE_DB } from '../../firebaseConfig';
 import { doc, getDoc, collection, getDocs, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image, ScrollView, ImageBackground } from 'react-native';
@@ -12,17 +13,18 @@ import fonts from '../theme/fonts';
 import axios from 'axios';
 
 const ProfileScreen = ({ route, navigation }) => {
-  const { userID, setProfiles, setReqFriends } = route.params;
+  const { userID, setProfiles, setReqFriends, setFriends } = route.params;
   const routes = useNavigationState(state => state.routes)
   const [userProfile, setUserProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [friendStatus, setFriendStatus] = useState(null);
   const windowWidth = Dimensions.get('window').width;
 
-  const fetchProfile = async ()  => {
+  const fetchProfile = async () => {
     try {
       const response = await axios.get(`http://localhost:8800/api/users/${userID}`);
       setUserProfile(response.data.body[0]);
+      setFriendStatus(response.data.friendStatus);
 
     } catch (error) {
       console.error("Error fetching posts: ", error);
@@ -32,17 +34,25 @@ const ProfileScreen = ({ route, navigation }) => {
   const fetchPosts = async () => {
     try {
       const response = await axios.get(`http://localhost:8800/api/users/${userID}/posts`);
-      setFriendStatus(response.data.friendStatus);
       setPosts(response.data.body);
     } catch (error) {
       if (error.status == 403) {
-        setFriendStatus(error.response.data.friendStatus);
+        console.log("no access to posts");
       }
       else {
         console.error("Error fetching posts:", error);
       }
     }
   }
+
+  useFocusEffect(
+    useCallback(() => {
+      const backToScreen = async () => {
+        await fetchProfile();
+      }
+      backToScreen();
+    }, [])
+  );
 
   useEffect(() => {
     const fetchAllProfileData = async () => {
@@ -57,7 +67,7 @@ const ProfileScreen = ({ route, navigation }) => {
       await fetchPosts();
     }
     fetchOnlyPosts();
-  }, [friendStatus])
+  }, [friendStatus]);
 
   const goToSettingsScreen = () => {
     navigation.navigate('Settings');
@@ -80,6 +90,10 @@ const ProfileScreen = ({ route, navigation }) => {
       result = await deleteFriend(userProfile.user_id);
       if (result) {
         setFriendStatus(result);
+        setUserProfile(prev => ({...prev, friend_count: prev.friend_count - 1}));
+        if (setFriends) {
+          setFriends(prev => prev.filter(item => item.user_id !== userProfile.user_id));
+        }
       }
     }
     else if (friendStatus == "stranger") {
@@ -95,8 +109,8 @@ const ProfileScreen = ({ route, navigation }) => {
       }
     }
     if (setProfiles) {
-        setProfiles(prev => prev.map(item => item.user_id === userProfile.user_id ? {...item, friendStatus: result} : item));      
-      }
+      setProfiles(prev => prev.map(item => item.user_id === userProfile.user_id ? { ...item, friendStatus: result } : item));
+    }
   }
 
   const deleteRequestHelper = async () => {
@@ -107,7 +121,7 @@ const ProfileScreen = ({ route, navigation }) => {
         setReqFriends(prev => prev.filter(item => item.user_id !== userProfile.user_id));
       }
       if (setProfiles) {
-        setProfiles(prev => prev.map(item => item.user_id === userProfile.user_id ? {...item, friendStatus: result} : item));      
+        setProfiles(prev => prev.map(item => item.user_id === userProfile.user_id ? { ...item, friendStatus: result } : item));
       }
     }
   }
@@ -117,14 +131,15 @@ const ProfileScreen = ({ route, navigation }) => {
     const result = await addFriend(userProfile.user_id);
     if (result) {
       setFriendStatus(result);
+      setUserProfile(prev => ({...prev, friend_count: prev.friend_count + 1}));
       if (setReqFriends) {
         setReqFriends(prev => prev.filter(item => item.user_id !== userProfile.user_id));
       }
       if (setProfiles) {
-        setProfiles(prev => prev.map(item => item.user_id === userProfile.user_id ? {...item, friendStatus: result} : item));      
+        setProfiles(prev => prev.map(item => item.user_id === userProfile.user_id ? { ...item, friendStatus: result } : item));
       }
     }
-    
+
   }
 
   const handlePostPress = (index) => {
@@ -162,7 +177,7 @@ const ProfileScreen = ({ route, navigation }) => {
                 <TouchableOpacity style={styles.deleteButton} onPress={async () => (await deleteRequestHelper())}>
                   <Text style={styles.buttonText}>Delete</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} onPress={async () => {await addFriendHelper()}}>
+                <TouchableOpacity style={styles.confirmButton} onPress={async () => { await addFriendHelper() }}>
                   <Text style={styles.buttonText}>Confirm</Text>
                 </TouchableOpacity>
               </View>

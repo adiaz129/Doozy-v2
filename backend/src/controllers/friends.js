@@ -1,4 +1,4 @@
-import { requestFriendInDB, deleteFriendRequestInDB, addFriendInDB, deleteFriendInDB, getIncomingFriendRequestsFromDB } from '../services/friends.js';
+import { requestFriendInDB, deleteFriendRequestInDB, addFriendInDB, deleteFriendInDB, getIncomingFriendRequestsFromDB, getAllFriendsFromDB } from '../services/friends.js';
 
 export const requestFriend = async (req, res) => {
     try {
@@ -157,4 +157,22 @@ export const getIncomingFriendRequests = async (req, res) => {
         console.error('Database error:', error);
         return res.status(500).json({ error: 'Database error' });
     }
+}
+
+export const getAllFriends = async (req, res) => {
+    try {
+        const userId = req.params.user_id;
+
+        const response = await getAllFriendsFromDB(userId);
+        if (response.success) {
+            return res.status(200).json(response);
+        }
+        else {
+            return res.status(400).json(response);
+        }
+    } catch (error) {
+        console.error('Database error:', error);
+        return res.status(500).json({ error: 'Database error' });
+    }
+    
 }

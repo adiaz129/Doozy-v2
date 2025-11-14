@@ -7,6 +7,6 @@ const router = express.Router();
 
 router.get('/search', getUsersFromSearch);
 router.get('/:user_id/posts', checkFriendStatus, getPostsByUserId);
-router.get('/:user_id', getUser);
+router.get('/:user_id', checkFriendStatus, getUser);
 
 export default router;

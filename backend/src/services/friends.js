@@ -67,6 +67,12 @@ export const addFriendInDB = async (requestingId, receivingId) => {
         const values2 = [Math.min(requestingId, receivingId), Math.max(requestingId, receivingId)];
         const [result2] = await connection.query(q2, values2);
 
+        const q3 = `UPDATE users
+                    SET friend_count = friend_count + 1
+                    WHERE user_id = ? OR user_id = ?;`;
+        const values3 = [requestingId, receivingId];
+        const [result3] = await connection.query(q3, values3);
+
         await connection.commit();
         return { success: true, message: 'Successful adding friend.' };
     } catch (error) {
@@ -78,15 +84,26 @@ export const addFriendInDB = async (requestingId, receivingId) => {
 }
 
 export const deleteFriendInDB = async (friend1, friend2) => {
+    const connection = await pool.getConnection();
     try {
-        const q = `DELETE FROM friends WHERE user_id1 = ? AND user_id2 = ?;`;
-        const values = [Math.min(friend1, friend2), Math.max(friend1, friend2)];
-        const [result] = await pool.query(q, values);
+        await connection.beginTransaction();
+        const q1 = `DELETE FROM friends WHERE user_id1 = ? AND user_id2 = ?;`;
+        const values1 = [Math.min(friend1, friend2), Math.max(friend1, friend2)];
+        const [result1] = await connection.query(q1, values1);
 
+        const q2 = `UPDATE users
+                    SET friend_count = friend_count - 1
+                    WHERE user_id = ? OR user_id = ?;`;
+        const values2 = [friend1, friend2];
+        const [result2] = await connection.query(q2, values2);
+
+        await connection.commit();
         return { success: true, message: 'Successful friend deletion.' };
     } catch (error) {
         console.log(error)
         return { success: false, message: 'Failed friend deletion.' };
+    } finally {
+        connection.release();
     }
 }
 
@@ -94,7 +111,7 @@ export const getIncomingFriendRequestsFromDB = async (userId) => {
     try {
         const q = `SELECT u.user_id, u.name, u.username, u.profile_pic, r.created_at
                     FROM users u
-                    INNER JOIN requests r ON r.requesting_id = u.user_id AND r.receiving_id = ?
+                    JOIN requests r ON r.requesting_id = u.user_id AND r.receiving_id = ?
                     ORDER BY r.created_at DESC;`;
         const [result] = await pool.query(q, [userId]);
         const updatedResult = result.map(item => ({
@@ -105,5 +122,21 @@ export const getIncomingFriendRequestsFromDB = async (userId) => {
         return { success: true, message: 'Successful retrieving friend requests.', body: updatedResult};
     } catch (error) {
         return { success: false, message: 'Failed to retrieve friend requests.'};
+    }
+}
+
+export const getAllFriendsFromDB = async (userId) => {
+    try {
+        const q = `SELECT u.user_id, u.name, u.username, u.profile_pic
+                    FROM users u
+                    JOIN friends f ON (f.user_id1 = u.user_id AND f.user_id2 = ?) 
+                        OR (f.user_id1 = ? AND f.user_id2 = u.user_id);`
+        const values = [userId, userId];
+        
+        const [result] = await pool.query(q, values);
+
+        return {success: true, message: "Successful retrieving friends.", body: result};
+    } catch (error) {
+        return error;
     }
 }
