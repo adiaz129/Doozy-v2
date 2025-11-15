@@ -1,5 +1,5 @@
 export const getTimePassedString = (timestamp) => {
-  const timestampMs = timestamp.seconds * 1000 + Math.floor(timestamp.nanoseconds / 1e6);
+  let timestampMs = new Date(timestamp).getTime();
   const now = new Date();
   const nowMs = now.getTime();
   const timePassedMs = nowMs - timestampMs;

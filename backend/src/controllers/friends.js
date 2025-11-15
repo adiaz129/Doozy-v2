@@ -91,7 +91,6 @@ export const addFriend = async (req, res) => {
 
         if (req.friendStatus !== "userReceivedRequest") {
             console.log(req.friendStatus);
-            console.log("HEREEEE")
             return res.status(400).json({ 
                 error: {
                     code: "INCORRECT_FRIEND_STATUS",

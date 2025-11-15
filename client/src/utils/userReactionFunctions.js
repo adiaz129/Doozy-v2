@@ -1,6 +1,7 @@
 import { arrayUnion, writeBatch, increment, arrayRemove, getDocs, getDoc } from "firebase/firestore";
 import { FIREBASE_AUTH, FIRESTORE_DB } from "../../firebaseConfig"
 import { doc, collection,  } from "firebase/firestore";
+import axios from "axios";
 
 
 export const fetchComments = async (postID) => {
@@ -53,15 +54,11 @@ export const deleteComment = async (postID, commentID) => {
 }
 
 export const fetchLikes = async (postID) => {
-    const likesRef = collection(FIRESTORE_DB, 'Posts', postID, 'Likes');
-    const snapshot = await getDocs(likesRef);
-    let userLikeList = [];
-    for (const likeDoc of snapshot.docs) {
-        const userLikeRef = doc(FIRESTORE_DB, 'Users', likeDoc.id);
-        const userSnap = await getDoc(userLikeRef);
-        if (userSnap.exists()) {
-            userLikeList.push({ id: userSnap.id, ...userSnap.data()});
-        }
-    }
-    return userLikeList;
+    try {
+    const response = await axios.get(`http://localhost:8800/api/posts/${postID}/likes`);
+    return response.data.body;
+    } catch (error) {
+        console.error(error.response.data.message);
+        return [];
+    }    
 }

@@ -1,15 +1,10 @@
-import { getPostsByUserIdInDB, getAllPostsInDB } from "../services/posts.js";
+import { toggleLikeInDB, getLikesFromDB } from '../services/likes.js'
 
-
-export const getPostsByUserId = async (req, res) => {
+export const toggleLike = async (req, res) => {
     try {
         const userId = req.user.uid;
-        const profileId = req.params.user_id;
-
-        if (req.friendStatus !== "friend" && req.friendStatus !== "currentUser") {
-            return res.status(403).json({ error: "Forbidden" });
-        }
-        const response = await getPostsByUserIdInDB(userId, profileId);
+        const postId = req.params.post_id;
+        const response = await toggleLikeInDB(userId, postId);
         if (response.success) {
             return res.status(200).json(response);
         }
@@ -18,14 +13,14 @@ export const getPostsByUserId = async (req, res) => {
         }
     } catch (error) {
         console.error('Database error:', error);
-        res.status(500).json({ error: 'Database error'});
+        res.status(500).json({ error: 'Database error' })
     }
 }
 
-export const getAllPosts = async (req, res) => {
+export const getLikes = async (req, res) => {
     try {
-        const userId = req.user.uid;
-        const response = await getAllPostsInDB(userId);
+        const postId = req.params.post_id;
+        const response = await getLikesFromDB(postId);
         if (response.success) {
             return res.status(200).json(response);
         }

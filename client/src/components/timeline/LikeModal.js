@@ -28,9 +28,9 @@ const LikeModal = (props) => {
         }, [])
 
     const ProfileCard = ({ item }) => (
-            <TouchableOpacity onPress={() => { toggleLikeModal(null); navigation.navigate('Profile', { userID: item.id, status: "unknown" }) }} style={styles.profileCard}>
+            <TouchableOpacity onPress={() => { toggleLikeModal(null); navigation.navigate('Profile', { userID: item.user_id, status: "unknown" }) }} style={styles.profileCard}>
                 <View style={styles.userInfo}>
-                    <Image source={{ uri: item.profilePic }} style={styles.profilePic} />
+                    <Image source={{ uri: item.profile_pic }} style={styles.profilePic} />
                     <View style={styles.profileCardNames}>
                         <Text style={styles.nameText}>{item.name}</Text>
                         <Text style={styles.usernameText}>{item.username}</Text>
@@ -50,10 +50,10 @@ const LikeModal = (props) => {
                 <View style={{ height: modalHeight, ...styles.flatList }}>
                     <FlatList
                         data={likeList}
-                        renderItem={({ item, index }) => {
+                        renderItem={({ item }) => {
                             return <ProfileCard item={item} />
                         }}
-                        keyExtractor={item => item.id}
+                        keyExtractor={item => item.user_id}
                         showsVerticalScrollIndicator={true}
                     />
                 </View>
