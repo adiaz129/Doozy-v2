@@ -1,7 +1,5 @@
 import React, { Component, useEffect, useState } from 'react';
 import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback, ImageBackground, RefreshControl, Modal } from 'react-native';
-import { FIREBASE_AUTH, FIRESTORE_DB } from '../../firebaseConfig';
-import { doc, getDoc, collection, getDocs, where, query, orderBy } from "firebase/firestore";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import fonts from '../theme/fonts';
 import colors from '../theme/colors';
@@ -9,10 +7,11 @@ import CheckedPostReceived from "../assets/checked-post-received.svg";
 import CheckedPost from '../assets/checked-post-sent.svg';
 import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getTimePassedString } from '../utils/timeFunctions'
-import { sendLike } from '../utils/userReactionFunctions';
+import { toggleLike } from '../utils/userReactionFunctions';
 import CommentModal from '../components/timeline/CommentModal';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LikeModal from '../components/timeline/LikeModal';
+import axios from 'axios';
 
 const TimelineScreen = (props) => {
   const [refreshing, setRefreshing] = useState(false);
@@ -20,109 +19,33 @@ const TimelineScreen = (props) => {
   const [currPostID, setCurrPostID] = useState(null);
   const [isCommentModalVisible, setCommentModalVisible] = useState(false);
   const [isLikeModalVisible, setLikeModalVisible] = useState(false);
-  const [isLiking, setIsLiking] = useState(false);
-
-
-  const currentUser = FIREBASE_AUTH.currentUser;
 
   useEffect(() => {
     refreshPosts();
   }, []);
 
 
-  const fetchFriends = async () => {
-
-    try {
-      const AllFriendsRef = collection(FIRESTORE_DB, 'Requests', currentUser.uid, 'AllFriends');
-      const snapshot = await getDocs(AllFriendsRef);
-      const friendsMap = {};
-      snapshot.forEach((doc) => {
-        friendsMap[doc.id] = doc.data();
-      });
-      return friendsMap;
-    } catch (error) {
-      console.error("Error fetching friends:", error);
-    }
-  }
-
-  const splitArray = (array, size) => {
-    const result = [];
-    for (let i = 0; i < array.length; i += size) {
-      result.push(array.slice(i, i + size));
-    }
-    return result;
-  }
-
-
   const refreshPosts = async () => {
-
-    if (!currentUser) return;
-
     try {
-
-      const friendMap = await fetchFriends();
-
-      const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-      const userSnapshot = await getDoc(userProfileRef);
-      const userProfileData = userSnapshot.data();
-      const likedPostsRef = collection(userProfileRef, 'LikedPosts');
-
-      friendMap[currentUser.uid] = { name: userProfileData.name, profilePic: userProfileData.profilePic, username: userProfileData.username };
-
-      const likedSnapshot = await getDocs(likedPostsRef);
-
-      const likedPostIDs = likedSnapshot.docs.map(doc => doc.id);
-
-      const friendIds = Object.keys(friendMap);
-      const batches = splitArray(friendIds, 10);
-
-      const postsRef = collection(FIRESTORE_DB, 'Posts');
-
-      let tempPosts = [];
-      for (const batch of batches) {
-        const q = query(postsRef, where("userId", "in", batch), where("hidden", "==", false), orderBy("timePosted", "desc"));
-        const snapshot = await getDocs(q);
-        tempPosts = tempPosts.concat(snapshot.docs.map(doc => ({ id: doc.id, userID: doc.data().userId, liked: likedPostIDs.includes(doc.id), ...doc.data(), ...friendMap[doc.data().userId] })))
-      }
-      setPosts(tempPosts);
-
+      const response = await axios.get(`http://localhost:8800/api/posts`);
+      const fetchedPosts = response.data.body;
+      setPosts(fetchedPosts);
     } catch (error) {
       console.error("Error fetching posts: ", error);
-    } finally {
-      setRefreshing(false);
     }
   };
 
-  const toggleLike = async (postID, didLike) => {
-    if (isLiking) return;
-    try {
-      setIsLiking(true);
-      await sendLike(postID, didLike);
-      setPosts(prevPosts =>
-        prevPosts.map(post =>
-          post.id === postID
-            ? { ...post, liked: !didLike, likeCount: didLike ? post.likeCount - 1 : post.likeCount + 1 }
-            : post
-        )
-      )
-    } catch (error) {
-      console.error("Error liking post:", error);
-    } finally {
-      setIsLiking(false);
-    }
-  }
-
   const likeOnly = async (postID, didLike) => {
       if (!didLike) {
-        toggleLike(postID, didLike);
+        await toggleLike(postID, setPosts);
       }
   }
 
   function doubleTapGesture(postID) {
     return Gesture.Tap().numberOfTaps(2).maxDuration(250).onEnd(() => {
-      const post = posts.find(p => p.id === postID);
+      const post = posts.find(p => p.post_id === postID);
       if (post) {
-        likeOnly(postID, post.liked);
+        likeOnly(postID, post.user_liked);
       }
     }).runOnJS(true);
   }
@@ -146,36 +69,36 @@ const TimelineScreen = (props) => {
 
   const renderTask = ({ item }) => (
     <View style={styles.postContainer}>
-      <TouchableOpacity onPress={() => { props.navigation.navigate('Profile', { userID: item.userID, status: currentUser.uid === item.userID ? 'currentUser' : 'friend' }) }} style={styles.profileInfo}>
-        <Image source={{ uri: item.profilePic }} style={styles.profilePic} />
+      <TouchableOpacity onPress={() => { props.navigation.navigate('Profile', { userID: item.user_id }) }} style={styles.profileInfo}>
+        <Image source={{ uri: item.profile_pic }} style={styles.profilePic} />
         <Text style={styles.username}>{item.username}</Text>
       </TouchableOpacity>
       {item.image && 
-      <GestureDetector gesture={doubleTapGesture(item.id)}>
+      <GestureDetector gesture={doubleTapGesture(item.post_id)}>
         <Image source={{ uri: item.image }} style={styles.postImage} />
       </GestureDetector>}
       <View style={styles.taskInfo}>
         {item.image && <View style={styles.reactionContainer}>
           <View style={styles.reaction}>
-            <TouchableOpacity onPress={() => toggleLike(item.id, item.liked)}>
-              {item.liked ? (<FontAwesome name='heart' size={24} color={colors.red} />)
+            <TouchableOpacity onPress={async () => await toggleLike(item.post_id, setPosts)}>
+              {item.user_liked ? (<FontAwesome name='heart' size={24} color={colors.red} />)
                 :
                 (<FontAwesome name='heart-o' size={24} color={colors.primary} />)}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => toggleLikeModal(item.id)}>
-              <Text style={styles.count}>{item.likeCount}</Text>
+            <TouchableOpacity onPress={() => toggleLikeModal(item.post_id)}>
+              <Text style={styles.count}>{item.like_count}</Text>
             </TouchableOpacity> 
           </View>
           <View style={styles.reaction}>
-            <TouchableOpacity onPress={() => {toggleCommentModal(item.id)}} style={{flexDirection: 'row', alignItems: 'center'}}>
+            <TouchableOpacity onPress={() => {toggleCommentModal(item.post_id)}} style={{flexDirection: 'row', alignItems: 'center'}}>
               <Ionicons name='chatbubble-outline' size={26} color={colors.primary} />
-              <Text style={styles.count}>{item.commentCount}</Text>
+              <Text style={styles.count}>{item.comment_count}</Text>
             </TouchableOpacity>
           </View>
         </View>}
         <View style={styles.postNameContainer}>
           <CheckedPostReceived width={32} height={32} />
-          <Text style={styles.taskName}>{item.postName}</Text>
+          <Text style={styles.taskName}>{item.post_name}</Text>
         </View>
         {item.description !== "" && <View style={styles.descriptionContainer}>
           <MaterialCommunityIcons name={"text"} size={16} color={colors.primary} />
@@ -183,23 +106,23 @@ const TimelineScreen = (props) => {
         </View>}
         {!item.image && <View style={styles.reactionContainer}>
           <View style={styles.reaction}>
-            <TouchableOpacity onPress={() => toggleLike(item.id, item.liked)}>
-              {item.liked ? (<FontAwesome name='heart' size={24} color={colors.red} />)
+            <TouchableOpacity onPress={async () => await toggleLike(item.post_id, setPosts)}>
+              {item.user_liked ? (<FontAwesome name='heart' size={24} color={colors.red} />)
                 :
                 (<FontAwesome name='heart-o' size={24} color={colors.primary} />)}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => toggleLikeModal(item.id)}>
-              <Text style={styles.count}>{item.likeCount}</Text>
+            <TouchableOpacity onPress={() => toggleLikeModal(item.post_id)}>
+              <Text style={styles.count}>{item.like_count}</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.reaction}>
-            <TouchableOpacity onPress={() => {toggleCommentModal(item.id)}} style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start'}}>
+            <TouchableOpacity onPress={() => {toggleCommentModal(item.post_id)}} style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start'}}>
               <Ionicons name='chatbubble-outline' size={26} color={colors.primary} />
-              <Text style={styles.count}>{item.commentCount}</Text>
+              <Text style={styles.count}>{item.comment_count}</Text>
             </TouchableOpacity>
           </View>
         </View>}
-        <Text style={styles.taskDate}>{getTimePassedString(item.timePosted)}</Text>
+        <Text style={styles.taskDate}>{getTimePassedString(item.time_posted)}</Text>
       </View>
     </View>
   );
@@ -245,8 +168,9 @@ const TimelineScreen = (props) => {
       </View>
       <FlatList
         data={posts}
+        extraData={posts}
         renderItem={renderTask}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.post_id}
         contentContainerStyle={{ flexGrow: 1 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />

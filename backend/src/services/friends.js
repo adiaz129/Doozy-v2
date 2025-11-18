@@ -29,6 +29,25 @@ export const checkFriendStatusInDB = async (currUser, fetchingUser) => {
     }
 }
 
+export const checkFriendStatusByPostInDB = async (postId, userId) => {
+    try {
+        const q = `SELECT p.user_id, COUNT(f.user_id1) AS hasAccess FROM posts p
+                    LEFT JOIN friends f ON f.user_id1 = LEAST(p.user_id, ?) AND f.user_id2 = GREATEST(p.user_id, ?)
+                    WHERE post_id = ?;`;
+        const values = [userId, userId, postId];
+        const [result] = await pool.query(q, values);
+
+        if (result[0].hasAccess > 0 || result[0].user_id == userId) {
+            return {success: true, access: true};
+        }
+        else {
+            return {success: true, access: false};
+        }
+    } catch (error) {
+        return {success: false}
+    }
+}
+
 export const requestFriendInDB = async (requestingId, receivingId) => {
     try {
         const q = `INSERT INTO requests (requesting_id, receiving_id) VALUES (?, ?);`;
