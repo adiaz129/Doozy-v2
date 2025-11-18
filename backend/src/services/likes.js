@@ -21,8 +21,7 @@ export const toggleLikeInDB = async (userId, postId) => {
             q3 = `UPDATE posts SET like_count = like_count + 1 WHERE post_id = ?;`
             user_liked = true;
         }
-        const q4 = `SELECT like_count FROM posts WHERE post_id = ?
-        `
+        const q4 = `SELECT like_count FROM posts WHERE post_id = ?`
         const values2 = [postId, userId];
         const values3 = [postId];
         const [result2] = await connection.query(q2, values2);

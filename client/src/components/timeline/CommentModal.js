@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useContext } from 'react';
 import { View, Text, TouchableOpacity, Keyboard, Dimensions, FlatList, Animated, TextInput, Modal, StyleSheet, Image, TouchableWithoutFeedback } from 'react-native';
 import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import { collection, doc, setDoc } from 'firebase/firestore';
@@ -8,13 +8,14 @@ import { deleteComment, fetchComments, sendComment } from '../../utils/userReact
 import { getTimePassedString } from '../../utils/timeFunctions';
 import colors from '../../theme/colors';
 import fonts from '../../theme/fonts';
+import { AuthContext } from '../../AuthContext.js';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 const CommentModal = (props) => {
     const { navigation, postID, toggleCommentModal, setPosts } = props;
 
-    const currentUser = FIREBASE_AUTH.currentUser;
+    const { auth } = useContext(AuthContext);
     const screenHeight = Dimensions.get('window').height;
     const modalHeight = screenHeight * 0.55;
     const maxHeight = screenHeight * 0.9;
@@ -60,33 +61,46 @@ const CommentModal = (props) => {
                 console.error("Error fetching comments:", error);
             }
         })();
-    }, [refresh])
+    }, [])
 
     const postComment = async () => {
-        await sendComment(postID, commentText);
-        setRefresh(!refresh);
-        if (setPosts) {
+        try {
+            const commentData = await sendComment(postID, commentText);
             setPosts(prevPosts =>
                 prevPosts.map(post =>
-                post.id === postID
-                    ? { ...post, commentCount: post.commentCount + 1 }
+                post.post_id === postID
+                    ? { ...post, comment_count: commentData.comment_count }
                     : post
                 )
             )
+            setCommentList(prevComments => [{  
+                comment_id: commentData.comment_id,
+                post_id: postID,
+                user_id: commentData.user.user_id,
+                comment: commentText,
+                time_commented: new Date(),
+                name: commentData.user.name,
+                username: commentData.user.username,
+                profile_pic: commentData.user.profile_pic,
+            }, ...prevComments,])
+            setCommentText("");
+            Keyboard.dismiss();
+        } catch (error) {
+            console.error("Error posting comment:", error);
         }
-        setCommentText("");
-        Keyboard.dismiss();
     }
 
     const deleteCommentHelper = async () => {
-        await deleteComment(postID, currCommentID);
-        setRefresh(!refresh);
+        const newCommentCount = await deleteComment(postID, currCommentID);
         setPosts(prevPosts =>
             prevPosts.map(post =>
-            post.id === postID
-                ? { ...post, commentCount: post.commentCount - 1 }
+            post.post_id === postID
+                ? { ...post, comment_count: newCommentCount}
                 : post
             )
+        )
+        setCommentList(prevComments => 
+            prevComments.filter(comment => comment.comment_id !== currCommentID)
         )
         setDeleteModalVisible(false);
     }
@@ -95,18 +109,18 @@ const CommentModal = (props) => {
         <View style={styles.commentContainer}>
             <View style={styles.infoTrashContainer}>
                 <View style={styles.userInfo}>
-                    <TouchableOpacity onPress={() => { toggleCommentModal(); navigation.navigate('Profile', { userID: item.userID, status: 'unknown' }) }}>
-                        <Image source={{ uri: item.profilePic }} style={styles.profilePic} />
+                    <TouchableOpacity onPress={() => { toggleCommentModal(); navigation.navigate('Profile', { userID: item.user_id }) }}>
+                        <Image source={{ uri: item.profile_pic }} style={styles.profilePic} />
                     </TouchableOpacity>
                     <View style={styles.profileCardNames}>
-                        <TouchableOpacity onPress={() => { toggleCommentModal(); navigation.navigate('Profile', { userID: item.userID, status: 'unknown' }) }}>
+                        <TouchableOpacity onPress={() => { toggleCommentModal(); navigation.navigate('Profile', { userID: item.user_id }) }}>
                             <Text style={styles.usernameText}>{item.username}</Text>
                         </TouchableOpacity>
                         <Text style={styles.commentText}>{item.comment}</Text>
-                        <Text style={styles.timePostedText}>{getTimePassedString(item.timePosted)}</Text>
+                        <Text style={styles.timePostedText}>{getTimePassedString(item.time_commented)}</Text>
                     </View>
                 </View>
-                {item.userID === currentUser.uid && <TouchableOpacity onPress={() => {setCurrCommentID(item.id); setDeleteModalVisible(true)}}>
+                {item.user_id === auth.uid && <TouchableOpacity onPress={() => {setCurrCommentID(item.comment_id); setDeleteModalVisible(true)}}>
                     <Ionicons name="ellipsis-vertical-outline" size={24} color={colors.primary} />
                 </TouchableOpacity>}
             </View>
@@ -145,10 +159,11 @@ const CommentModal = (props) => {
                 <View style={{ height: commentsHeight, ...styles.flatList }}>
                     <FlatList
                         data={commentList}
-                        renderItem={({ item, index }) => {
+                        extraData={commentList}
+                        renderItem={({ item }) => {
                             return (renderList(item));
                         }}
-                        keyExtractor={item => item.id}
+                        keyExtractor={item => item.comment_id}
                         showsVerticalScrollIndicator={true}
                         keyboardShouldPersistTaps="handled"
                     />

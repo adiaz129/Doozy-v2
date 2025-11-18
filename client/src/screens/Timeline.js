@@ -9,7 +9,7 @@ import CheckedPostReceived from "../assets/checked-post-received.svg";
 import CheckedPost from '../assets/checked-post-sent.svg';
 import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getTimePassedString } from '../utils/timeFunctions'
-import { sendLike } from '../utils/userReactionFunctions';
+import { toggleLike } from '../utils/userReactionFunctions';
 import CommentModal from '../components/timeline/CommentModal';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LikeModal from '../components/timeline/LikeModal';
@@ -70,28 +70,9 @@ const TimelineScreen = (props) => {
     }
   };
 
-  const toggleLike = async (postID, didLike) => {
-    if (isLiking) return;
-    try {
-      setIsLiking(true);
-      const response = await axios.post(`http://localhost:8800/api/posts/${postID}/like`);
-      setPosts(prevPosts =>
-        prevPosts.map(post =>
-          post.post_id === postID
-            ? { ...post, user_liked: response.data.user_liked, like_count: response.data.like_count }
-            : post
-        )
-      )
-    } catch (error) {
-      console.error("Error liking post:", error);
-    } finally {
-      setIsLiking(false);
-    }
-  }
-
   const likeOnly = async (postID, didLike) => {
       if (!didLike) {
-        toggleLike(postID, didLike);
+        await toggleLike(postID, setPosts);
       }
   }
 
@@ -134,7 +115,7 @@ const TimelineScreen = (props) => {
       <View style={styles.taskInfo}>
         {item.image && <View style={styles.reactionContainer}>
           <View style={styles.reaction}>
-            <TouchableOpacity onPress={() => toggleLike(item.post_id, item.user_liked)}>
+            <TouchableOpacity onPress={async () => await toggleLike(item.post_id, setPosts)}>
               {item.user_liked ? (<FontAwesome name='heart' size={24} color={colors.red} />)
                 :
                 (<FontAwesome name='heart-o' size={24} color={colors.primary} />)}
@@ -160,7 +141,7 @@ const TimelineScreen = (props) => {
         </View>}
         {!item.image && <View style={styles.reactionContainer}>
           <View style={styles.reaction}>
-            <TouchableOpacity onPress={() => toggleLike(item.post_id, item.user_liked)}>
+            <TouchableOpacity onPress={async () => await toggleLike(item.post_id, setPosts)}>
               {item.user_liked ? (<FontAwesome name='heart' size={24} color={colors.red} />)
                 :
                 (<FontAwesome name='heart-o' size={24} color={colors.primary} />)}

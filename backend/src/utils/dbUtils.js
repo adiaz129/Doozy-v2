@@ -93,7 +93,7 @@ const requestsQuery = `CREATE TABLE IF NOT EXISTS requests (
 const likesQuery = `CREATE TABLE IF NOT EXISTS likes (
     post_id INT NOT NULL,
     user_id INT NOT NULL,
-    time_liked timestamp NOT NULL DEFAULT (UTC_TIMESTAMP()),
+    time_liked TIMESTAMP NOT NULL DEFAULT (UTC_TIMESTAMP()),
     PRIMARY KEY (post_id, user_id),
     FOREIGN KEY (post_id) REFERENCES posts(post_id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
@@ -104,6 +104,7 @@ const commentsQuery = `CREATE TABLE IF NOT EXISTS comments (
     post_id INT NOT NULL,
     user_id INT NOT NULL,
     comment VARCHAR(250) NOT NULL,
+    time_commented TIMESTAMP NOT NULL DEFAULT (UTC_TIMESTAMP()),
     FOREIGN KEY (post_id) REFERENCES posts(post_id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );`
