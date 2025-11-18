@@ -1,7 +1,5 @@
 import React, { Component, useEffect, useState } from 'react';
 import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback, ImageBackground, RefreshControl, Modal } from 'react-native';
-import { FIREBASE_AUTH, FIRESTORE_DB } from '../../firebaseConfig';
-import { doc, getDoc, collection, getDocs, where, query, orderBy } from "firebase/firestore";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import fonts from '../theme/fonts';
 import colors from '../theme/colors';
@@ -21,52 +19,19 @@ const TimelineScreen = (props) => {
   const [currPostID, setCurrPostID] = useState(null);
   const [isCommentModalVisible, setCommentModalVisible] = useState(false);
   const [isLikeModalVisible, setLikeModalVisible] = useState(false);
-  const [isLiking, setIsLiking] = useState(false);
-
-
-  const currentUser = FIREBASE_AUTH.currentUser;
 
   useEffect(() => {
     refreshPosts();
   }, []);
 
 
-  const fetchFriends = async () => {
-
-    try {
-      const AllFriendsRef = collection(FIRESTORE_DB, 'Requests', currentUser.uid, 'AllFriends');
-      const snapshot = await getDocs(AllFriendsRef);
-      const friendsMap = {};
-      snapshot.forEach((doc) => {
-        friendsMap[doc.id] = doc.data();
-      });
-      return friendsMap;
-    } catch (error) {
-      console.error("Error fetching friends:", error);
-    }
-  }
-
-  const splitArray = (array, size) => {
-    const result = [];
-    for (let i = 0; i < array.length; i += size) {
-      result.push(array.slice(i, i + size));
-    }
-    return result;
-  }
-
-
   const refreshPosts = async () => {
     try {
       const response = await axios.get(`http://localhost:8800/api/posts`);
-      const fetchedPosts = response.data.body.map(post => ({
-        ...post,
-        //if nothign else remove this
-      }));
+      const fetchedPosts = response.data.body;
       setPosts(fetchedPosts);
     } catch (error) {
       console.error("Error fetching posts: ", error);
-    } finally {
-      setRefreshing(false);
     }
   };
 
@@ -104,8 +69,8 @@ const TimelineScreen = (props) => {
 
   const renderTask = ({ item }) => (
     <View style={styles.postContainer}>
-      <TouchableOpacity onPress={() => { props.navigation.navigate('Profile', { userID: item.userID }) }} style={styles.profileInfo}>
-        <Image source={{ uri: item.profilePic }} style={styles.profilePic} />
+      <TouchableOpacity onPress={() => { props.navigation.navigate('Profile', { userID: item.user_id }) }} style={styles.profileInfo}>
+        <Image source={{ uri: item.profile_pic }} style={styles.profilePic} />
         <Text style={styles.username}>{item.username}</Text>
       </TouchableOpacity>
       {item.image && 
