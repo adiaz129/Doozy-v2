@@ -1,13 +1,14 @@
 import { pool } from "../config/db.js";
 
-export const getPostsByUserIdInDB = async (userId, profileId) => {
+export const getPostsByUserIdInDB = async (profileId) => {
     try {
         const q = `SELECT * FROM posts 
                     WHERE user_id = ?
                     ORDER BY time_posted DESC
                     LIMIT 15`;
-        const values = [userId, profileId];
+        const values = [profileId];
         const [result] = await pool.query(q, values);
+        console.log(result)
 
         return {success: true, message: "Successfully fetched posts from user.", body: result};
     } catch (error) {

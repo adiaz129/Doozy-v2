@@ -6,8 +6,9 @@ export const postTaskToDB = async (task, userId) => {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
-        const q1 = "INSERT INTO tasks (user_id, task_name, description, complete_by_date, is_completion_time, priority, repeat_interval, repeat_ends, is_completed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        const values1 = [userId, task.task_name, task.description, task.complete_by_date, task.is_completion_time, task.priority, task.repeat_interval, task.repeat_ends, task.is_completed];
+
+        const q1 = "INSERT INTO tasks (user_id, task_name, description, complete_by_date, is_completion_time, priority, repeat_interval, repeat_ends, is_completed, time_task_completed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        const values1 = [userId, task.task_name, task.description, task.complete_by_date, task.is_completion_time, task.priority, task.repeat_interval, task.repeat_ends, task.is_completed, new Date().toISOString().slice(0, 19).replace('T', ' ')];
         const [result1] = await connection.query(q1, values1);
 
         if (Array.isArray(task.lists) && task.lists.length > 0) {
@@ -22,14 +23,44 @@ export const postTaskToDB = async (task, userId) => {
             await connection.query(q3, [values3]);
         }
 
-        if (Array.isArray(task.notifications) && task.notifications.length > 0) {
-            const q4 = "INSERT INTO notifications (notification_id, task_id) VALUES ?";
-            const values4 = task.notifications.map(notificationId => [notificationId, result1.insertId]);
-            await connection.query(q4, [values4]);
+        let repeated_task_id = null;
+        if (task.is_completed && task.new_complete_by_date) {
+            const q4 = "INSERT INTO tasks (user_id, task_name, description, complete_by_date, is_completion_time, priority, repeat_interval, repeat_ends, is_completed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            const values4 = [userId, task.task_name, task.description, task.new_complete_by_date, task.is_completion_time, task.priority, task.repeat_interval, task.repeat_ends, false];
+            const [result4] = await connection.query(q4, values4);
+            repeated_task_id = result4.insertId;
+
+            if (Array.isArray(task.lists) && task.lists.length > 0) {
+                const q5 = "INSERT INTO task_list (list_id, task_id) VALUES ?";
+                const values5 = task.lists.map(listId => [listId, repeated_task_id]);
+                await connection.query(q5, [values5]);
+            }
+
+            if (Array.isArray(task.reminders) && task.reminders.length > 0) {
+                const q6 = "INSERT INTO reminders (reminder_id, task_id) VALUES ?";
+                const values6 = task.reminders.map(reminderId => [reminderId, repeated_task_id]);
+                await connection.query(q6, [values6]);
+            }
+
+            if (Array.isArray(task.notifications) && task.notifications.length > 0) {
+                const q7 = "INSERT INTO notifications (notification_id, task_id) VALUES ?";
+                const values7 = task.notifications.map(notificationId => [notificationId, repeated_task_id]);
+                await connection.query(q7, [values7]);
+            }
+        }
+
+        if (task.post) {
+            const q8 = `INSERT INTO posts (user_id, post_name, description, image) VALUES (?, ?, ?, ?);`;
+            const values8 = [userId, task.task_name, task.description, task.image];
+            await connection.query(q8, values8);
+
+            const q9 = `UPDATE users SET post_count = post_count + 1 WHERE user_id = ?`
+            const values9 = [userId];
+            await connection.query(q9, values9);
         }
 
         await connection.commit();
-        return { success: true, message: "Task created successfully.", task_id: result1.insertId };
+        return { success: true, message: "Task created successfully.", task_id: result1.insertId, repeated_task_id };
     } catch (error) {
         console.log(error);
         await connection.rollback();
@@ -63,6 +94,7 @@ export const getAllTasksFromDB = async (userId) => {
             GROUP BY t.task_id;`;
         const values = [userId];
         const [result] = await pool.query(q, values);
+
         const parsedResult = result.map(task => ({
             ...task,
             is_completed: !!task.is_completed,
@@ -262,7 +294,11 @@ export const updateTaskInDB = async (taskId, userId, task) => {
             const q2 = `INSERT INTO posts (user_id, post_name, description, image) VALUES (?, ?, ?, ?);`;
             const values2 = [userId, task.task_name, task.description, task.image];
             await connection.query(q2, values2);
-        }
+
+            const q8 = `UPDATE users SET post_count = post_count + 1 WHERE user_id = ?`
+            const values8 = [userId];
+            await connection.query(q8, values8);
+        };
 
         let new_task_id = null;
         if (task.completing && task.new_complete_by_date) {

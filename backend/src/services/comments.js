@@ -37,6 +37,7 @@ export const postCommentToDB = async (postId, userId, comment) => {
         return {success: true, message: 'Successfully posted comment.', comment_count: result3[0].comment_count, comment_id: result1.insertId, user: result4[0]};
     } catch (error) {
         console.log(error);
+        await connection.rollback();
         return {success: false, message: 'Failed to post comment.'};
     } finally {
         connection.release();
@@ -62,6 +63,7 @@ export const deleteCommentInDB = async (postId, commentId) => {
         return {success: true, message: 'Successfully deleted comment.', comment_count: result3[0].comment_count};
     } catch (error) {
         console.log(error);
+        await connection.rollback();
         return {success: false, message: 'Failed to delete comment.'};
 
     } finally {

@@ -3,13 +3,12 @@ import { getPostsByUserIdInDB, getAllPostsInDB } from "../services/posts.js";
 
 export const getPostsByUserId = async (req, res) => {
     try {
-        const userId = req.user.uid;
         const profileId = req.params.user_id;
 
         if (req.friendStatus !== "friend" && req.friendStatus !== "currentUser") {
             return res.status(403).json({ error: "Forbidden" });
         }
-        const response = await getPostsByUserIdInDB(userId, profileId);
+        const response = await getPostsByUserIdInDB(profileId);
         if (response.success) {
             return res.status(200).json(response);
         }
