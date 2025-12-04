@@ -215,11 +215,12 @@ const EditTask = (props) => {
                                 }
                                 : currTask
                         );
+                    if (response.data.new_task_id) {
                         updatedTasks.push({
-                            task_id: response.data.task_id,
+                            task_id: response.data.new_task_id,
                             task_name: editedTaskName,
                             description: editedDescription,
-                            complete_by_date: selectedDate,
+                            complete_by_date: newCompleteByDate,
                             is_completion_time: isTime,
                             priority: selectedPriority,
                             reminders: selectedReminders,
@@ -230,6 +231,7 @@ const EditTask = (props) => {
                             is_completed: false,
                             time_task_created: new Date()
                         })
+                    }
                     setAllTasks(updatedTasks);
                 }
             }

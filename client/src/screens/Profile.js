@@ -49,18 +49,11 @@ const ProfileScreen = ({ route, navigation }) => {
     useCallback(() => {
       const backToScreen = async () => {
         await fetchProfile();
+        await fetchPosts();
       }
       backToScreen();
     }, [])
   );
-
-  useEffect(() => {
-    const fetchAllProfileData = async () => {
-      await fetchProfile();
-      await fetchPosts();
-    }
-    fetchAllProfileData();
-  }, []);
 
   useEffect(() => {
     const fetchOnlyPosts = async () => {
@@ -143,7 +136,7 @@ const ProfileScreen = ({ route, navigation }) => {
   }
 
   const handlePostPress = (index) => {
-    navigation.navigate("Post", { post: posts[index], user: userProfile })
+    navigation.navigate("Post", { post: posts[index], user: userProfile})
   }
 
   return (

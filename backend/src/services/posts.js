@@ -1,16 +1,21 @@
 import { pool } from "../config/db.js";
 
-export const getPostsByUserIdInDB = async (profileId) => {
+export const getPostsByUserIdInDB = async (profileId, userId) => {
     try {
-        const q = `SELECT * FROM posts 
-                    WHERE user_id = ?
+        const q = `SELECT p.*, COUNT(l.user_id) AS user_liked FROM posts p
+                    LEFT JOIN likes l ON l.post_id = p.post_id AND l.user_id = ?
+                    WHERE p.user_id = ?
+                    GROUP BY p.post_id
                     ORDER BY time_posted DESC
                     LIMIT 15`;
-        const values = [profileId];
+        const values = [userId, profileId];
         const [result] = await pool.query(q, values);
-        console.log(result)
+        const parsedResult = result.map(post => ({
+            ...post,
+            user_liked: post.user_liked > 0
+        }))
 
-        return {success: true, message: "Successfully fetched posts from user.", body: result};
+        return {success: true, message: "Successfully fetched posts from user.", body: parsedResult};
     } catch (error) {
         console.log(error);
         return {success: false, message: "Failed to fetch posts from user."};
