@@ -110,7 +110,6 @@ const commentsQuery = `CREATE TABLE IF NOT EXISTS comments (
 );`
 
 
-//make 
 
 const createTable = async (tableName, query) => {
     try {

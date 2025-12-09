@@ -52,3 +52,25 @@ export const getAllPostsInDB = async (userId) => {
         return {success: false, message: "Failed to fetch posts."};
     }
 }
+
+export const deletePostInDB = async (userId, postId) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        const q1 = `DELETE FROM posts WHERE user_id = ? AND post_id = ?`;
+        const values1 = [userId, postId];
+        await connection.query(q1, values1);
+        const q2 = `UPDATE users SET post_count = post_count - 1 WHERE user_id = ?`
+        const values2 = [userId];
+        await connection.query(q2, values2);
+
+        await connection.commit()
+        return {success: true, message: "Successfully deleted post."};
+    } catch (error) {
+        console.log(error)
+        await connection.rollback();
+        return {success: false, message: "Failed to delete post."};
+    } finally {
+        connection.release();
+    }
+}

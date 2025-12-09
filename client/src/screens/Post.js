@@ -7,21 +7,17 @@ import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import fonts from "../theme/fonts";
 import colors from "../theme/colors";
 import { getTimePassedString } from '../utils/timeFunctions'
-import { sendLike, toggleLike } from "../utils/userReactionFunctions";
+import { toggleLike } from "../utils/userReactionFunctions";
 import CommentModal from "../components/timeline/CommentModal";
-import { FIREBASE_AUTH, FIRESTORE_DB } from "../../firebaseConfig";
-import { doc, getDoc, getDocs, collection, writeBatch, increment, arrayRemove } from "firebase/firestore";
-import { getStorage, ref, deleteObject } from "firebase/storage";
 import { AuthContext } from "../AuthContext.js";
 import LikeModal from "../components/timeline/LikeModal";
+import axios from "axios";
 
 const PostScreen = ({ route, navigation }) => {
   const { post, user } = route.params;
 
   const [isCommentModalVisible, setCommentModalVisible] = useState(false);
   const [tempPost, setTempPost] = useState([post]);
-  const [liked, setLiked] = useState(false);
-  const [isLiking, setIsLiking] = useState(false);
   const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
   const [isLikeModalVisible, setLikeModalVisible] = useState(false);
   const { auth } = useContext(AuthContext);
@@ -47,44 +43,15 @@ const PostScreen = ({ route, navigation }) => {
   }
 
   const deleteItem = async () => {
-    const docId = post.id;
-    const image = post.image;
-    const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-    const listsRef = collection(userProfileRef, 'Lists');
+    
     try {
-      const batch = writeBatch(FIRESTORE_DB);
-      let listRef;
-      const postRef = doc(FIRESTORE_DB, 'Posts', post.id);
-      const likesRef = collection(postRef, 'Likes');
-      const commentsRef = collection(postRef, 'Comments');
-      post.listIds.forEach((listId) => {
-        listRef = doc(listsRef, listId);
-        batch.update(listRef, { postIds: arrayRemove(docId) })
-      });
-      const likesSnap = await getDocs(likesRef);
-      likesSnap.forEach(likeDoc => {
-        const userLikeRef = doc(FIRESTORE_DB, 'Users', likeDoc.id, 'LikedPosts', docId);
-        batch.delete(userLikeRef);
-        batch.delete(likeDoc.ref);
-      });
-
-      const commentsSnap = await getDocs(commentsRef);
-      commentsSnap.forEach(commentDoc => {
-        batch.delete(commentDoc.ref);
-      });
-      batch.delete(postRef);
-      if (image) {
-        const imageRef = ref(getStorage(), image);
-        await deleteObject(imageRef);
-      }
-      batch.update(userProfileRef, { posts: increment(-1) });
+      console.log(post.post_id)
+      const response = await axios.delete(`http://localhost:8800/api/posts/${post.post_id}`);
       setDeleteModalVisible(false);
       navigation.goBack();
-      await batch.commit();
     } catch (error) {
-      console.error('Error deleting document: ', error);
-    };
-
+      console.error("Error deleting post: ", error);
+    }
   }
 
   return (
