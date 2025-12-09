@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import { StyleSheet, Text, View, Image, TouchableOpacity, Modal, TouchableWithoutFeedback } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CheckedPostReceived from "../assets/checked-post-received.svg";
@@ -7,24 +7,21 @@ import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import fonts from "../theme/fonts";
 import colors from "../theme/colors";
 import { getTimePassedString } from '../utils/timeFunctions'
-import { sendLike } from "../utils/userReactionFunctions";
+import { toggleLike } from "../utils/userReactionFunctions";
 import CommentModal from "../components/timeline/CommentModal";
-import { FIREBASE_AUTH, FIRESTORE_DB } from "../../firebaseConfig";
-import { doc, getDoc, getDocs, collection, writeBatch, increment, arrayRemove } from "firebase/firestore";
-import { getStorage, ref, deleteObject } from "firebase/storage";
+import { AuthContext } from "../AuthContext.js";
 import LikeModal from "../components/timeline/LikeModal";
+import axios from "axios";
 
-//CHAGE EVERYTING
 const PostScreen = ({ route, navigation }) => {
   const { post, user } = route.params;
 
   const [isCommentModalVisible, setCommentModalVisible] = useState(false);
   const [tempPost, setTempPost] = useState([post]);
-  const [liked, setLiked] = useState(false);
-  const [isLiking, setIsLiking] = useState(false);
   const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
   const [isLikeModalVisible, setLikeModalVisible] = useState(false);
-  const currentUser = FIREBASE_AUTH.currentUser;
+  const { auth } = useContext(AuthContext);
+
 
   const toggleCommentModal = () => {
     setCommentModalVisible(!isCommentModalVisible);
@@ -33,88 +30,28 @@ const PostScreen = ({ route, navigation }) => {
     setLikeModalVisible(!isLikeModalVisible);
   }
 
-  const toggleLike = async (postID) => {
-    if (isLiking) return;
-    try {
-      setIsLiking(true);
-      await sendLike(postID, liked);
-      setTempPost(prevPosts =>
-        prevPosts.map(post =>
-          true
-            ? { ...post, likeCount: liked ? post.likeCount - 1 : post.likeCount + 1 }
-            : post
-        )
-      )
-      setLiked(!liked);
-    } catch (error) {
-      console.error("Error liking post:", error);
-    } finally {
-      setIsLiking(false);
-    }
-  }
-
   const likeOnly = async (postID) => {
-    if (!liked) {
-      toggleLike(postID);
+    if (!tempPost[0].user_liked) {
+      await toggleLike(postID, setTempPost);
     }
   }
 
   function doubleTapGesture(postID) {
     return Gesture.Tap().numberOfTaps(2).maxDuration(250).onEnd(() => {
-      likeOnly(postID, liked);
+      likeOnly(postID);
     }).runOnJS(true);
   }
 
-  const setLikeStatus = async () => {
-    const currentUser = FIREBASE_AUTH.currentUser;
-    const currUserLikeRef = doc(FIRESTORE_DB, 'Users', currentUser.uid, 'LikedPosts', post.id)
-    const likedSnapshot = await getDoc(currUserLikeRef);
-    setLiked(likedSnapshot.exists());
-  }
-
-  useEffect(() => {
-    setLikeStatus();
-  }, [])
-
   const deleteItem = async () => {
-    const docId = post.id;
-    const image = post.image;
-    const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-    const listsRef = collection(userProfileRef, 'Lists');
+    
     try {
-      const batch = writeBatch(FIRESTORE_DB);
-      let listRef;
-      const postRef = doc(FIRESTORE_DB, 'Posts', post.id);
-      const likesRef = collection(postRef, 'Likes');
-      const commentsRef = collection(postRef, 'Comments');
-      post.listIds.forEach((listId) => {
-        listRef = doc(listsRef, listId);
-        batch.update(listRef, { postIds: arrayRemove(docId) })
-      });
-      const likesSnap = await getDocs(likesRef);
-      likesSnap.forEach(likeDoc => {
-        const userLikeRef = doc(FIRESTORE_DB, 'Users', likeDoc.id, 'LikedPosts', docId);
-        batch.delete(userLikeRef);
-        batch.delete(likeDoc.ref);
-      });
-
-      const commentsSnap = await getDocs(commentsRef);
-      commentsSnap.forEach(commentDoc => {
-        batch.delete(commentDoc.ref);
-      });
-      batch.delete(postRef);
-      if (image) {
-        const imageRef = ref(getStorage(), image);
-        await deleteObject(imageRef);
-      }
-      batch.update(userProfileRef, { posts: increment(-1) });
+      console.log(post.post_id)
+      const response = await axios.delete(`http://localhost:8800/api/posts/${post.post_id}`);
       setDeleteModalVisible(false);
       navigation.goBack();
-      await batch.commit();
     } catch (error) {
-      console.error('Error deleting document: ', error);
-    };
-
+      console.error("Error deleting post: ", error);
+    }
   }
 
   return (
@@ -149,7 +86,7 @@ const PostScreen = ({ route, navigation }) => {
         </TouchableWithoutFeedback>
         <CommentModal
           navigation={navigation}
-          postID={tempPost[0].id}
+          postID={tempPost[0].post_id}
           toggleCommentModal={toggleCommentModal}
           setPosts={setTempPost}
         />
@@ -165,7 +102,7 @@ const PostScreen = ({ route, navigation }) => {
         </TouchableWithoutFeedback>
         <LikeModal
           navigation={navigation}
-          postID={post.id}
+          postID={tempPost[0].post_id}
           toggleLikeModal={toggleLikeModal}
         />
       </Modal>
@@ -179,36 +116,36 @@ const PostScreen = ({ route, navigation }) => {
           <Image source={{ uri: user.profilePic }} style={styles.profilePic} />
           <Text style={styles.username}>{user.username}</Text>
         </View>
-        {currentUser.uid === user.id && <TouchableOpacity onPress={() => setDeleteModalVisible(true)}>
+        {auth.uid === user.user_id && <TouchableOpacity onPress={() => setDeleteModalVisible(true)}>
           <Ionicons name="ellipsis-vertical-outline" size={24} color={colors.primary} />
         </TouchableOpacity>}
       </View>
       {tempPost[0].image &&
-        <GestureDetector gesture={doubleTapGesture(tempPost[0].id)}>
+        <GestureDetector gesture={doubleTapGesture(tempPost[0].post_id)}>
           <Image source={{ uri: tempPost[0].image }} style={styles.postImage} />
         </GestureDetector>}
       <View style={styles.taskInfo}>
         {tempPost[0].image && <View style={styles.reactionContainer}>
           <View style={styles.reaction}>
-            <TouchableOpacity onPress={() => toggleLike(tempPost[0].id)}>
-              {liked ? (<FontAwesome name='heart' size={24} color={colors.red} />)
+            <TouchableOpacity onPress={async () => await toggleLike(tempPost[0].post_id)}>
+              {tempPost[0].user_liked ? (<FontAwesome name='heart' size={24} color={colors.red} />)
                 :
                 (<FontAwesome name='heart-o' size={24} color={colors.primary} />)}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => toggleLikeModal(post.id)}>
-              <Text style={styles.count}>{tempPost[0].likeCount}</Text>
+            <TouchableOpacity onPress={() => toggleLikeModal(post.post_id)}>
+              <Text style={styles.count}>{tempPost[0].like_count}</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.reaction}>
             <TouchableOpacity onPress={() => { toggleCommentModal() }} style={{flexDirection: 'row', alignItems: 'center'}}>
               <Ionicons name='chatbubble-outline' size={26} color={colors.primary} />
-              <Text style={styles.count}>{tempPost[0].commentCount}</Text>
+              <Text style={styles.count}>{tempPost[0].comment_count}</Text>
             </TouchableOpacity>
           </View>
         </View>}
         <View style={styles.postNameContainer}>
           <CheckedPostReceived width={32} height={32} />
-          <Text style={styles.taskName}>{tempPost[0].postName}</Text>
+          <Text style={styles.taskName}>{tempPost[0].post_name}</Text>
         </View>
         {tempPost[0].description !== "" && <View style={styles.descriptionContainer}>
           <MaterialCommunityIcons name={"text"} size={16} color={colors.primary} />
@@ -216,23 +153,23 @@ const PostScreen = ({ route, navigation }) => {
         </View>}
         {!tempPost[0].image && <View style={styles.reactionContainer}>
           <View style={styles.reaction}>
-            <TouchableOpacity onPress={() => toggleLike(tempPost[0].id)}>
-              {liked ? (<FontAwesome name='heart' size={24} color={colors.red} />)
+            <TouchableOpacity onPress={async () => await toggleLike(tempPost[0].post_id, setTempPost)}>
+              {tempPost[0].user_liked ? (<FontAwesome name='heart' size={24} color={colors.red} />)
                 :
                 (<FontAwesome name='heart-o' size={24} color={colors.primary} />)}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => toggleLikeModal(post.id)}>
-              <Text style={styles.count}>{tempPost[0].likeCount}</Text>
+            <TouchableOpacity onPress={() => toggleLikeModal(post.post_id, setTempPost)}>
+              <Text style={styles.count}>{tempPost[0].like_count}</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.reaction}>
             <TouchableOpacity onPress={() => { toggleCommentModal() }}>
               <Ionicons name='chatbubble-outline' size={26} color={colors.primary} />
             </TouchableOpacity>
-            <Text style={styles.count}>{tempPost[0].commentCount}</Text>
+            <Text style={styles.count}>{tempPost[0].comment_count}</Text>
           </View>
         </View>}
-        <Text style={styles.taskDate}>{getTimePassedString(tempPost[0].timePosted)}</Text>
+        <Text style={styles.taskDate}>{getTimePassedString(tempPost[0].time_posted)}</Text>
       </View>
     </SafeAreaView>
   );

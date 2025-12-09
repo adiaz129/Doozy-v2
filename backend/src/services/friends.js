@@ -96,6 +96,7 @@ export const addFriendInDB = async (requestingId, receivingId) => {
         return { success: true, message: 'Successful adding friend.' };
     } catch (error) {
         console.log(error)
+        await connection.rollback();
         return { success: false, message: 'Failed adding friend.'};
     } finally {
         connection.release();
@@ -120,6 +121,7 @@ export const deleteFriendInDB = async (friend1, friend2) => {
         return { success: true, message: 'Successful friend deletion.' };
     } catch (error) {
         console.log(error)
+        await connection.rollback();
         return { success: false, message: 'Failed friend deletion.' };
     } finally {
         connection.release();

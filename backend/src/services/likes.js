@@ -33,6 +33,7 @@ export const toggleLikeInDB = async (userId, postId) => {
 
     } catch (error) {
         console.log(error);
+        await connection.rollback();
         return {success: false, message: "Failed to toggle like."};
     } finally {
         connection.release();

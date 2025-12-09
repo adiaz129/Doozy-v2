@@ -73,7 +73,7 @@ const TaskListScreen = (props) => {
                 time_task_created: new Date(task.time_task_created),
                 complete_by_date: task.complete_by_date ? new Date(task.complete_by_date) : null,
                 repeat_ends: task.repeat_ends ? new Date(task.repeat_ends) : null,
-                time_task_completed: task.time_task_completed? new Date(task.time_task_completed) : null,
+                time_task_completed: task.time_task_completed ? new Date(task.time_task_completed) : null,
             }));
             setAllTasks(fetchedTasks);
         } catch (error) {
@@ -252,19 +252,17 @@ const TaskListScreen = (props) => {
                     new_complete_by_date: newCompleteByDate ? new Date(newCompleteByDate).toISOString().slice(0, 19).replace('T', ' ') : 0,
                     new_notifications: tempNotifIds,
                 });
-                if (response.data.success) {
-                    console.log(response.data.message);
-                    let updatedTasks = allTasks.map(currTask =>
-                            currTask.task_id === task.task_id
-                                ? {...currTask, is_completed: true, time_task_completed: new Date() }
-                                : currTask  
-                        );
-                    if (response.data.new_task_id) {
-                        updatedTasks.push({...task, task_id: response.data.new_task_id, complete_by_date: new Date(newCompleteByDate), notifications: tempNotifIds, time_task_created: new Date()});
-                    }
-                    setAllTasks(updatedTasks);
-                    await cancelNotifications(task.notifications);
+                console.log(response.data.message);
+                let updatedTasks = allTasks.map(currTask =>
+                        currTask.task_id === task.task_id
+                            ? {...currTask, is_completed: true, time_task_completed: new Date() }
+                            : currTask  
+                    );
+                if (response.data.new_task_id) {
+                    updatedTasks.push({...task, task_id: response.data.new_task_id, complete_by_date: new Date(newCompleteByDate), notifications: tempNotifIds, time_task_created: new Date()});
                 }
+                setAllTasks(updatedTasks);
+                await cancelNotifications(task.notifications);
 
             } catch (error) {
                 // add error if image fails
@@ -311,36 +309,36 @@ const TaskListScreen = (props) => {
         if (currDueDate >= new Date()) { //completed task on time
             flag = 1;
         }
-        while (currDueDate < new Date() || flag === 1) { //completed task late
+        let tempCurrDueDate = currDueDate;
+        while (tempCurrDueDate < new Date() || flag === 1) { //completed task late
             if (repeatEnds) {
-                let tempCurrDueDate = currDueDate;
-                tempCurrDueDate.setHours(0, 0, 0, 0);
-                repeatEnds.setHours(0, 0, 0, 0);
-                if (currDueDate > repeatEnds) {
+                let nextDay = new Date(repeatEnds)
+                nextDay.setDate(repeatEnds.getDate() + 1);
+                if (tempCurrDueDate >= nextDay) {
                     return 0;
                 }
             }
             if (selectedRepeat == 0) {
-                currDueDate.setDate(currDueDate.getDate() + 1);
+                tempCurrDueDate.setDate(tempCurrDueDate.getDate() + 1);
             }
             else if (selectedRepeat == 1) {
-                currDueDate.setDate(currDueDate.getDate() + 7);
+                tempCurrDueDate.setDate(tempCurrDueDate.getDate() + 7);
             }
             else if (selectedRepeat == 2) {
-                currDueDate.setMonth(currDueDate.getMonth() + 1);
+                tempCurrDueDate.setMonth(tempCurrDueDate.getMonth() + 1);
             }
             else if (selectedRepeat == 3) {
-                currDueDate.setYear(currDueDate.getFullYear() + 1);
+                tempCurrDueDate.setYear(tempCurrDueDate.getFullYear() + 1);
             }
             else {
-                if (currDueDate.getDay() === 5) {
-                    currDueDate.setDate(currDueDate.getDate() + 3);
+                if (tempCurrDueDate.getDay() === 5) {
+                    tempCurrDueDate.setDate(tempCurrDueDate.getDate() + 3);
                 }
-                else if (currDueDate.getDay() === 6) {
-                    currDueDate.setDate(currDueDate.getDate() + 2);
+                else if (tempCurrDueDate.getDay() === 6) {
+                    tempCurrDueDate.setDate(tempCurrDueDate.getDate() + 2);
                 }
                 else {
-                    currDueDate.setDate(currDueDate.getDate() + 1);
+                    tempCurrDueDate.setDate(tempCurrDueDate.getDate() + 1);
                 }
             }
             if (flag === 1) {
@@ -348,14 +346,11 @@ const TaskListScreen = (props) => {
             }
         }
         if (repeatEnds) {
-            let tempCurrDueDate = currDueDate;
-            tempCurrDueDate.setHours(0, 0, 0, 0);
-            repeatEnds.setHours(0, 0, 0, 0);
-            if (currDueDate > repeatEnds) {
+            if (tempCurrDueDate > repeatEnds) {
                 return 0;
             }
         }
-        return currDueDate;
+        return tempCurrDueDate;
     }
 
     const deleteItem = async (index, complete) => {

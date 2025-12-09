@@ -72,10 +72,18 @@ const TaskCreation = (props) => {
 
     const storeTask = async (image, post) => {
         try {
-            let notifications = []
-            if (reminders.length !== 0) {
+            let newCompleteByDate = 0;
+            let notifications = [];
+            if (reminders.length !== 0) { // schedule notifications
                 if (await configureNotifications()) {
-                    notifications = await scheduleNotifications(reminders, complete_by_date, is_completion_time, task_name);
+                    if (is_completed) {
+                        if (complete_by_date && (newCompleteByDate = isRepeatingTask(complete_by_date, repeat_ends, repeat_interval))) {
+                            notifications = await scheduleNotifications(reminders, newCompleteByDate, is_completion_time, task_name);
+                        }
+                    }
+                    else {
+                        notifications = await scheduleNotifications(reminders, complete_by_date, is_completion_time, task_name);
+                    }
                 }
             }
             const response = await axios.post('http://localhost:8800/api/tasks', {
@@ -91,9 +99,10 @@ const TaskCreation = (props) => {
                     lists: selectedLists, 
                     reminders, 
                     notifications, 
-                    image
+                    image,
+                    new_complete_by_date: newCompleteByDate ? new Date(newCompleteByDate).toISOString().slice(0, 19).replace('T', ' ') : 0,
                 });
-            if (response.data.success) {
+                
                 setAllTasks(prev => [...prev, {
                     task_id: response.data.task_id, 
                     task_name, 
@@ -106,13 +115,29 @@ const TaskCreation = (props) => {
                     is_completed, 
                     lists: selectedLists, 
                     reminders, 
+                    notifications: newCompleteByDate ? null : notifications, 
+                    time_task_created: new Date(),
+                    time_task_completed: is_completed ? new Date() : null
+                }, 
+                ...(response.data.repeated_task_id ? [{
+                    task_id: response.data.repeated_task_id, 
+                    task_name, 
+                    description, 
+                    complete_by_date: newCompleteByDate ? newCompleteByDate : null, 
+                    is_completion_time, 
+                    priority, 
+                    repeat_interval, 
+                    repeat_ends: repeat_ends ? repeat_ends : null, 
+                    is_completed: false, 
+                    lists: selectedLists, 
+                    reminders, 
                     notifications, 
                     time_task_created: new Date(),
                     time_task_completed: null
-                }])
+                }] : [])
+            ])
                 console.log(response.data.message);
 
-            }
         } catch (error) { // add an error check for 401 and logout
             console.log(error.response.data.message);
             // await cancelNotifications(notifications);
