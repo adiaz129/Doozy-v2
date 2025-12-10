@@ -35,7 +35,7 @@ export const getUsersFromSearchFromDB = async (userId, searchQuery) => {
 }
 
 export const updateUserInDB = async (userId, userEdits) => {
-    const allowedFields = ['name', 'username', 'bio', 'username_lower']
+    const allowedFields = ['name', 'username', 'bio', 'username_lower', 'profile_pic'];
     try {
         const setClauses = [];
         const values = [];
@@ -50,8 +50,7 @@ export const updateUserInDB = async (userId, userEdits) => {
             return { success: false, message: 'No valid fields to update.' };
         }
         values.push(userId);
-        console.log(setClauses)
-        console.log(values);
+
         const q = `UPDATE users SET ${setClauses.join(', ')} WHERE user_id = ?;`;
         await pool.query(q, values);
 

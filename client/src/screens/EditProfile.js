@@ -53,7 +53,7 @@ const EditProfileScreen = ({route, navigation}) => {
           </View>
             <TouchableWithoutFeedback style={{flex: 1}} onPress={() => {Keyboard.dismiss()}}>
                 <KeyboardAvoidingView style={styles.editContainer}>
-                    <UploadImage userID={user.id} />
+                    <UploadImage userID={user.user_id} profilePic={user.profile_pic} />
                     <TouchableOpacity onPress={openNameEdit}style={styles.textEditContainer}>
                         <Text style={styles.prompt}>Name</Text>
                         <Text style={styles.textInput}>{user.name}</Text>
