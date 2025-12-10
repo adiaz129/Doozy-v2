@@ -5,7 +5,7 @@ export const register = async (req, res) => {
     const user = new UserModel({ 
         ...req.body, 
         username_lower: req.body.username.toLowerCase(), 
-        profile_pic: "profilepic", // change this
+        profile_pic: "https://firebasestorage.googleapis.com/v0/b/doozy-3d54c.appspot.com/o/profilePics%2Fdefault.jpg?alt=media&token=c4b20aae-830c-4d47-aa90-2a3ebd6e16fb",
     })
     try {
         const response = await postRegister(user);
