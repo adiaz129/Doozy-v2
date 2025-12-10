@@ -33,3 +33,34 @@ export const getUsersFromSearchFromDB = async (userId, searchQuery) => {
         return {success: false, message: 'Failed search query.'};
     }
 }
+
+export const updateUserInDB = async (userId, userEdits) => {
+    const allowedFields = ['name', 'username', 'bio', 'username_lower']
+    try {
+        const setClauses = [];
+        const values = [];
+
+        for (const key in userEdits) {
+            if (allowedFields.includes(key)) {
+                setClauses.push(`${key} = ?`);
+                values.push(userEdits[key]);
+            }
+        }
+        if (setClauses.length === 0) {
+            return { success: false, message: 'No valid fields to update.' };
+        }
+        values.push(userId);
+        console.log(setClauses)
+        console.log(values);
+        const q = `UPDATE users SET ${setClauses.join(', ')} WHERE user_id = ?;`;
+        await pool.query(q, values);
+
+        return {success: true, message: 'Successful update profile.'};
+    } catch (error) {
+        console.log(error);
+        if (error.code === 'ER_DUP_ENTRY') {
+            return {success: false, message: 'Username is taken'};
+        }
+        return {success: false, message: 'Failed update query.'};
+    }
+}

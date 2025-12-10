@@ -3,7 +3,7 @@ import { StyleSheet, View, TouchableOpacity, TextInput } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {Ionicons} from '@expo/vector-icons';
 import { useState } from "react";
-import { updateNameField, updateUsernameField, updateBioField } from '../utils/checkFieldFunctions';
+import { updateField } from '../utils/checkFieldFunctions';
 import { StackActions } from '@react-navigation/native';
 import colors from "../theme/colors";
 import fonts from "../theme/fonts";
@@ -19,15 +19,15 @@ const EditFieldScreen = ({route, navigation}) => {
         try {
             let tempUser = user;
             if (fieldName == "Name") {
-                await updateNameField(field);
+                await updateField({name: field});
                 tempUser.name = field
             }
             else if (fieldName == "Username") {
-                await updateUsernameField(field);
+                await updateField({username: field, username_lower: field.toLowerCase()});
                 tempUser.username = field;
             }
             else {
-                await updateBioField(field);
+                await updateField({bio: field});
                 tempUser.bio = field;
             }
             navigation.dispatch(StackActions.popTo('EditProfile', {
