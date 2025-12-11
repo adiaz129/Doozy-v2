@@ -20,7 +20,7 @@ export default function Settings() {
     const [isReauthVisible, setReauthVisible] = useState(false);
     const [isError, setError] = useState(false);
     const [isLogOutModalVisible, setLogOutModalVisible] = useState(false);
-    const currentUser = FIREBASE_AUTH.currentUser;
+
     const navigation = useNavigation();
 
     useEffect(() => {

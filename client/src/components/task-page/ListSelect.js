@@ -22,7 +22,6 @@ const ListSelect = (props) => {
     const screenHeight = Dimensions.get('window').height;
     const listMenuXPosition = screenWidth * .7 - 150;
 
-    const currentUser = FIREBASE_AUTH.currentUser;
     const addListRef = useRef(null);
     const listItemRefs = useRef({})
     const inputHeight = 50;

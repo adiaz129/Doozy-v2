@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { jwtDecode } from 'jwt-decode';
 
 if (!global.atob) {
@@ -22,7 +22,7 @@ const AuthProvider = ({ children }) => {
 
     const getAuthState = async () => {
         try {
-            const authToken = await AsyncStorage.getItem("authToken");
+            const authToken = await SecureStore.getItemAsync("authToken");
             if (!authToken) {
                 setAuthState({ token: null, uid: null });
                 configureAxiosHeaders(null);
@@ -39,7 +39,7 @@ const AuthProvider = ({ children }) => {
 
     const setAuth = async (authToken) => {
         try {
-            await AsyncStorage.setItem("authToken", authToken);
+            await SecureStore.setItemAsync("authToken", authToken);
             configureAxiosHeaders(authToken);
             const authData = jwtDecode(authToken);
             setAuthState({ token: authToken, uid: authData.uid });
@@ -50,7 +50,7 @@ const AuthProvider = ({ children }) => {
 
     const logout = async () => {
         try {
-            await AsyncStorage.removeItem("authToken");
+            await SecureStore.deleteItemAsync("authToken");
             configureAxiosHeaders(null);
             setAuthState({ token: null, uid: null });
         } catch (error) {

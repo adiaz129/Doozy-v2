@@ -16,10 +16,6 @@ const firebaseConfig = {
 };
 
 const FIREBASE_APP = initializeApp(firebaseConfig);
-const FIREBASE_AUTH = initializeAuth(FIREBASE_APP, {
-    persistence: getReactNativePersistence(AsyncStorage)
-  });
-const FIRESTORE_DB = getFirestore(FIREBASE_APP);
 const FIREBASE_STORAGE = getStorage(FIREBASE_APP);
 
 
@@ -85,4 +81,4 @@ const uploadToFirebase = async (uri, name, onProgress) => {
 // }
 
 
-export { FIREBASE_APP, FIREBASE_AUTH, FIRESTORE_DB, FIREBASE_STORAGE, uploadToFirebase };
+export { FIREBASE_APP, FIREBASE_STORAGE, uploadToFirebase };

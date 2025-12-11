@@ -45,7 +45,8 @@
           "cameraPermission": "The app uses your camera to let you take photos."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

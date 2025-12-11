@@ -40,7 +40,6 @@ const TaskCreation = (props) => {
     const [cameraOptionModalVisible, setCameraOptionModalVisible] = useState(false);
     const [resolver, setResolver] = useState(null);
 
-    const currentUser = FIREBASE_AUTH.currentUser;
 
     const modalHeight = 730;
     const taskCreationHeight = 135;
