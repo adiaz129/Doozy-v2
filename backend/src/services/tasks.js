@@ -50,8 +50,9 @@ export const postTaskToDB = async (task, userId) => {
         }
 
         if (task.post) {
-            const q8 = `INSERT INTO posts (user_id, post_name, description, image) VALUES (?, ?, ?, ?);`;
-            const values8 = [userId, task.task_name, task.description, task.image];
+            const status = task.image ? "pending" : "validated";
+            const q8 = `INSERT INTO posts (user_id, post_name, description, image, status) VALUES (?, ?, ?, ?, ?);`;
+            const values8 = [userId, task.task_name, task.description, task.image, status];
             await connection.query(q8, values8);
 
             const q9 = `UPDATE users SET post_count = post_count + 1 WHERE user_id = ?`
@@ -291,8 +292,9 @@ export const updateTaskInDB = async (taskId, userId, task) => {
         }
 
         if (task.post) {
-            const q2 = `INSERT INTO posts (user_id, post_name, description, image) VALUES (?, ?, ?, ?);`;
-            const values2 = [userId, task.task_name, task.description, task.image];
+            const status = task.image ? "pending" : "validated";
+            const q2 = `INSERT INTO posts (user_id, post_name, description, image, status) VALUES (?, ?, ?, ?, ?);`;
+            const values2 = [userId, task.task_name, task.description, task.image, status];
             await connection.query(q2, values2);
 
             const q8 = `UPDATE users SET post_count = post_count + 1 WHERE user_id = ?`

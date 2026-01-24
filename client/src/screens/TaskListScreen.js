@@ -196,7 +196,7 @@ const TaskListScreen = (props) => {
                 let imageURI;
                 let post = true;
                 if (Platform.OS === 'android') { //TEMPORARY FIX
-                    imageURI = await addImage();
+                    imageURI = await addImage("post");
                 }
                 else {
                     while (true) {
@@ -206,13 +206,13 @@ const TaskListScreen = (props) => {
                             return;
                         }
                         else if (cameraOption == 'library') {
-                            imageURI = await addImage();
+                            imageURI = await addImage("post");
                             if (imageURI) {
                                 break;
                             }
                         }
                         else if (cameraOption == 'camera') {
-                            imageURI = await takePhoto();
+                            imageURI = await takePhoto("post");
                             if (imageURI) {
                                 break;
                             }
@@ -230,6 +230,8 @@ const TaskListScreen = (props) => {
                     setCameraOptionModalVisible(false);
                 }
 
+                
+
                 let newCompleteByDate;
                 let tempNotifIds = [];
                 if (task.complete_by_date && (newCompleteByDate = isRepeatingTask(task.complete_by_date, task.repeat_ends, task.repeat_interval))) {// check if task repeats and return next possible date
@@ -240,19 +242,17 @@ const TaskListScreen = (props) => {
                     }
                 }
 
+                let response = await axios.patch(`http://localhost:8800/api/tasks/${task.task_id}`, {
+                        completing: true,
+                        task_name: task.task_name,
+                        description: task.description,
+                        is_completed: true,
+                        post: post,
+                        image: imageURI,
+                        new_complete_by_date: newCompleteByDate ? new Date(newCompleteByDate).toISOString().slice(0, 19).replace('T', ' ') : 0,
+                        new_notifications: tempNotifIds,
+                    });
 
-
-                const response = await axios.patch(`http://localhost:8800/api/tasks/${task.task_id}`, {
-                    completing: true,
-                    task_name: task.task_name,
-                    description: task.description,
-                    is_completed: true,
-                    post: post,
-                    image: imageURI,
-                    new_complete_by_date: newCompleteByDate ? new Date(newCompleteByDate).toISOString().slice(0, 19).replace('T', ' ') : 0,
-                    new_notifications: tempNotifIds,
-                });
-                console.log(response.data.message);
                 let updatedTasks = allTasks.map(currTask =>
                         currTask.task_id === task.task_id
                             ? {...currTask, is_completed: true, time_task_completed: new Date() }
@@ -297,6 +297,7 @@ const TaskListScreen = (props) => {
 
             } catch (error) {
                 console.error('Error updating task completion: ', error);
+                // add error check of cancelling notifs and adding them again
             }
         }
     }

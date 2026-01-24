@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import uploadRoutes from './src/routes/uploads.js';
 import userRoutes from './src/routes/users.js';
 import taskRoutes from './src/routes/tasks.js';
 import authRoutes from './src/routes/auth.js';
@@ -16,6 +17,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/uploads', verifyToken, uploadRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', verifyToken, taskRoutes);
 app.use('/api/lists', verifyToken, listRoutes);

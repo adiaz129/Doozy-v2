@@ -85,150 +85,80 @@ const TaskCreation = (props) => {
                     }
                 }
             }
-            const response = await axios.post('http://localhost:8800/api/tasks', {
-                    task_name, 
-                    description, 
-                    complete_by_date: complete_by_date ? new Date(complete_by_date).toISOString().slice(0, 19).replace('T', ' ') : null, 
-                    is_completion_time, 
-                    priority, 
-                    repeat_interval, 
-                    repeat_ends: repeat_ends ? new Date(repeat_ends).toISOString().slice(0, 19).replace('T', ' ') : null, 
-                    is_completed, 
-                    post, 
-                    lists: selectedLists, 
-                    reminders, 
-                    notifications, 
+            const MAX_RETRIES = 5;
+            let response;
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+                response = await axios.post('http://localhost:8800/api/tasks', {
+                    task_name,
+                    description,
+                    complete_by_date: complete_by_date ? new Date(complete_by_date).toISOString().slice(0, 19).replace('T', ' ') : null,
+                    is_completion_time,
+                    priority,
+                    repeat_interval,
+                    repeat_ends: repeat_ends ? new Date(repeat_ends).toISOString().slice(0, 19).replace('T', ' ') : null,
+                    is_completed,
+                    post,
+                    lists: selectedLists,
+                    reminders,
+                    notifications,
                     image,
                     new_complete_by_date: newCompleteByDate ? new Date(newCompleteByDate).toISOString().slice(0, 19).replace('T', ' ') : 0,
+                }, {
+                    validateStatus: status => status === 200 || status === 202
                 });
-                
-                setAllTasks(prev => [...prev, {
-                    task_id: response.data.task_id, 
-                    task_name, 
-                    description, 
-                    complete_by_date: complete_by_date ? complete_by_date : null, 
-                    is_completion_time, 
-                    priority, 
-                    repeat_interval, 
-                    repeat_ends: repeat_ends ? repeat_ends : null, 
-                    is_completed, 
-                    lists: selectedLists, 
-                    reminders, 
-                    notifications: newCompleteByDate ? null : notifications, 
-                    time_task_created: new Date(),
-                    time_task_completed: is_completed ? new Date() : null
-                }, 
-                ...(response.data.repeated_task_id ? [{
-                    task_id: response.data.repeated_task_id, 
-                    task_name, 
-                    description, 
-                    complete_by_date: newCompleteByDate ? newCompleteByDate : null, 
-                    is_completion_time, 
-                    priority, 
-                    repeat_interval, 
-                    repeat_ends: repeat_ends ? repeat_ends : null, 
-                    is_completed: false, 
-                    lists: selectedLists, 
-                    reminders, 
-                    notifications, 
-                    time_task_created: new Date(),
-                    time_task_completed: null
-                }] : [])
+                if (response.status === 200) {
+                    break;
+                }
+                if (response.status === 202) {
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+            }
+            if (response.status === 202) {
+                throw new Error('Max retries reached for task creation');
+            }
+
+            setAllTasks(prev => [...prev, {
+                task_id: response.data.task_id,
+                task_name,
+                description,
+                complete_by_date: complete_by_date ? complete_by_date : null,
+                is_completion_time,
+                priority,
+                repeat_interval,
+                repeat_ends: repeat_ends ? repeat_ends : null,
+                is_completed,
+                lists: selectedLists,
+                reminders,
+                notifications: newCompleteByDate ? null : notifications,
+                time_task_created: new Date(),
+                time_task_completed: is_completed ? new Date() : null
+            },
+            ...(response.data.repeated_task_id ? [{
+                task_id: response.data.repeated_task_id,
+                task_name,
+                description,
+                complete_by_date: newCompleteByDate ? newCompleteByDate : null,
+                is_completion_time,
+                priority,
+                repeat_interval,
+                repeat_ends: repeat_ends ? repeat_ends : null,
+                is_completed: false,
+                lists: selectedLists,
+                reminders,
+                notifications,
+                time_task_created: new Date(),
+                time_task_completed: null
+            }] : [])
             ])
-                console.log(response.data.message);
+            console.log(response.data.message);
 
         } catch (error) { // add an error check for 401 and logout
-            console.log(error.response.data.message);
-            // await cancelNotifications(notifications);
+            console.log(error.response?.data.message);
+            await cancelNotifications(notifications);
         } finally {
             setTaskCreationModalVisible(false);
         }
     }
-
-    // const storeTask = async (imageURI, hidden) => {
-    //     is_completed ? cookedBatch = await storeCompletedTask(taskRef, batch, imageURI, hidden) : cookedBatch = await storeIncompletedTask(false, taskRef, batch);
-    //     await cookedBatch.commit();
-    //     setTaskCreationModalVisible(false);
-    // }
-
-    // const storeIncompletedTask = async (blockNotifications, taskRef, batch) => {
-    //     const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-    //     try {
-    //         batch.set(taskRef, {
-    //             taskName: task_name,
-    //             description: description,
-    //             completeByDate: complete_by_date,
-    //             isCompletionTime: is_completion_time,
-    //             priority: priority,
-    //             reminders: reminders,
-    //             repeat_interval: repeat_interval,
-    //             repeatEnds: repeat_ends,
-    //             listIds: selectedLists,
-    //             timeTaskCreated: new Date(),
-    //             notificationIds: [],
-    //         });
-    //         let listRef;
-    //         selectedLists.forEach((listId) => {
-    //             listRef = doc(userProfileRef, 'Lists', listId);
-    //             batch.update(listRef, { taskIds: arrayUnion(taskRef.id) });
-    //         });
-    //         batch.update(userProfileRef, { tasks: increment(1) });
-    //         if (!blockNotifications && reminders.length !== 0) {
-    //             if (await configureNotifications()) {
-    //                 const tempNotifIds = await scheduleNotifications(reminders, complete_by_date, is_completion_time, task_name);
-    //                 batch.update(taskRef, { notificationIds: tempNotifIds });
-    //             }
-    //         }
-    //         return batch;
-    //     } catch (error) {
-    //         console.error("Error storing task:", error);
-    //     }
-    // }
-
-    // const storeCompletedTask = async (taskRef, batch, imageURI, hidden) => {
-    //     const userProfileRef = doc(FIRESTORE_DB, 'Users', currentUser.uid);
-    //     const postsRef = collection(FIRESTORE_DB, 'Posts');
-    //     const postRef = doc(postsRef);
-
-    //     try {
-    //         batch.set(postRef, {
-    //             userId: currentUser.uid,
-    //             postName: task_name,
-    //             description: description,
-    //             timePosted: new Date(),
-    //             timeTaskCreated: new Date(),
-    //             image: imageURI,
-    //             completeByDate: complete_by_date,
-    //             isCompletionTime: is_completion_time,
-    //             priority: priority,
-    //             reminders: reminders,
-    //             listIds: selectedLists,
-    //             hidden: hidden,
-    //             likeCount: 0,
-    //             commentCount: 0,
-    //         })
-    //         let listRef;
-    //         selectedLists.forEach((listId) => {
-    //             listRef = doc(userProfileRef, 'Lists', listId);
-    //             batch.update(listRef, { postIds: arrayUnion(postRef.id) });
-    //         });
-    //         let newCompleteByDate;
-    //         if (complete_by_date && (newCompleteByDate = isRepeatingTask(complete_by_date.timestamp, repeat_ends, repeat_interval))) {
-    //             batch = await storeIncompletedTask(true, taskRef, batch);
-    //             batch.update(taskRef, { completeByDate: newCompleteByDate });
-    //             if (reminders.length !== 0) {
-    //                 if (await configureNotifications()) {
-    //                     const tempNotifIds = await scheduleNotifications(reminders, newCompleteByDate, is_completion_time, task_name);
-    //                     batch.update(taskRef, { notificationIds: tempNotifIds });
-    //                 }
-    //             }
-    //         }
-    //         batch.update(userProfileRef, { posts: increment(1) });
-    //         return batch;
-    //     } catch (error) {
-    //         console.error("Error storing post:", error);
-    //     }
-    // }
 
     const toggleCalendarModal = () => {
         setCalendarModalVisible(!isCalendarModalVisible);
@@ -267,7 +197,7 @@ const TaskCreation = (props) => {
 
     const handleSubmitHelper = async () => {
         if (is_completed) {
-            let imageURI;
+            let s3Key;
             let post = true;
             while (true) {
                 const cameraOption = await openCameraOptionMenu();
@@ -276,29 +206,29 @@ const TaskCreation = (props) => {
                     return;
                 }
                 else if (cameraOption == 'library') {
-                    imageURI = await addImage();
-                    if (imageURI) {
+                    s3Key = await addImage("post");
+                    if (s3Key) {
                         break;
                     }
                 }
                 else if (cameraOption == 'camera') {
-                    imageURI = await takePhoto();
-                    if (imageURI) {
+                    s3Key = await takePhoto("post");
+                    if (s3Key) {
                         break;
                     }
                 }
                 else if (cameraOption == 'no post') {
-                    imageURI = null;
+                    s3Key = null;
                     post = false;
                     break;
                 }
                 else {
-                    imageURI = null;
+                    s3Key = null;
                     break;
                 }
             }
             setCameraOptionModalVisible(false); //add loading screen here
-            storeTask(imageURI, post);
+            storeTask(s3Key, post);
         }
         else {
             storeTask(null, false);
@@ -404,7 +334,7 @@ const TaskCreation = (props) => {
                                 <TextInput
                                     ref={textTaskInputRef}
                                     style={styles.inputTask}
-                                    onChangeText={text => { setTask_name(text)}}
+                                    onChangeText={text => { setTask_name(text) }}
                                     value={task_name}
                                     placeholder={'Type your task here...'}
                                     placeholderTextColor={'#C7C7CD'}

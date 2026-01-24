@@ -33,6 +33,13 @@ export const updateUser = async (req, res) => {
         const userId = req.user.uid;
         const userEdits = req.body;
 
+        if (userEdits.profile_pic) {
+            const validationResponse = await getUploadValidationInDB(userEdits.profile_pic);
+            if (!validationResponse.success) {
+                return res.status(validationResponse.status).json(response);
+            }
+        }
+
         const response = await updateUserInDB(userId, userEdits);
         if (response.success) {
             return res.status(200).json(response);

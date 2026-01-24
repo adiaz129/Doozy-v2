@@ -68,6 +68,9 @@ const postsQuery = `CREATE TABLE IF NOT EXISTS posts (
     description VARCHAR(255) DEFAULT NULL,
     time_posted TIMESTAMP NOT NULL DEFAULT (UTC_TIMESTAMP()),
     image VARCHAR(255) DEFAULT NULL,
+    image_access_url TEXT DEFAULT NULL,
+    image_url_expires TIMESTAMP DEFAULT NULL,
+    status VARCHAR(20) DEFAULT "pending",
     like_count INT NOT NULL DEFAULT 0,
     comment_count INT NOT NULL DEFAULT 0
 )`
@@ -109,6 +112,10 @@ const commentsQuery = `CREATE TABLE IF NOT EXISTS comments (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );`
 
+const uploadValidationQuery = `CREATE TABLE IF NOT EXISTS upload_validation (
+    upload_key VARCHAR(255) PRIMARY KEY,
+    validated BOOLEAN
+);`;
 
 
 const createTable = async (tableName, query) => {

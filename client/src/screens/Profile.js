@@ -252,7 +252,7 @@ const ProfileScreen = ({ route, navigation }) => {
                         </View>
                       </View>
                       {post.image && (
-                        <Image source={{ uri: post.image }} style={styles.photo} />
+                        <Image source={{ uri: post.image_url }} style={styles.photo} />
                       )}
                     </View>
                   </TouchableOpacity>

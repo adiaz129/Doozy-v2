@@ -75,7 +75,7 @@ const TimelineScreen = (props) => {
       </TouchableOpacity>
       {item.image && 
       <GestureDetector gesture={doubleTapGesture(item.post_id)}>
-        <Image source={{ uri: item.image }} style={styles.postImage} />
+        <Image source={{ uri: item.image_url }} style={styles.postImage} />
       </GestureDetector>}
       <View style={styles.taskInfo}>
         {item.image && <View style={styles.reactionContainer}>

@@ -1,4 +1,6 @@
 import { pool } from "../config/db.js";
+import { getPresignedURL } from "../controllers/uploads.js";
+import { getUploadValidationInS3 } from "./uploads.js";
 
 export const getPostsByUserIdInDB = async (profileId, userId) => {
     try {
@@ -15,10 +17,10 @@ export const getPostsByUserIdInDB = async (profileId, userId) => {
             user_liked: post.user_liked > 0
         }))
 
-        return {success: true, message: "Successfully fetched posts from user.", body: parsedResult};
+        return { success: true, message: "Successfully fetched posts from user.", body: parsedResult };
     } catch (error) {
         console.log(error);
-        return {success: false, message: "Failed to fetch posts from user."};
+        return { success: false, message: "Failed to fetch posts from user." };
     }
 }
 
@@ -40,16 +42,61 @@ export const getAllPostsInDB = async (userId) => {
                     LIMIT 10;`;
         const values = [userId, userId, userId, userId, userId];
         const [result] = await pool.query(q, values);
-        const parsedResult = result.map(post => ({
-            ...post,
-            user_liked: post.user_liked > 0
-        }))
 
-        return {success: true, message: "Successfully fetched all posts.", body: parsedResult};
+        await Promise.all(
+            result.map(async post => {
+                if (post.status === "pending") {
+                    const status = await getUploadValidationInS3(post.image);
+                    if (status !== "pending") {
+                        await pool.query(
+                            `UPDATE posts SET status = ? WHERE post_id = ?`,
+                            [status, post.post_id]
+                        );
+                        post.status = status;
+                    }
+                }
+            })
+        );
+
+        const parsedResult = await Promise.all(
+            result.map(async (post) => {
+                const user_liked = post.user_liked > 0;
+
+                let image_url = null;
+
+                if (post.status === "validated" && post.image) {
+                    const now = new Date();
+
+                    if (post.image_access_url && post.image_url_expires && new Date(post.image_url_expires) > now) {
+                        image_url = post.image_access_url;
+                    } 
+                    else {
+                        image_url = await getPresignedURL(post.image);
+                        const expiresAt = new Date(now.getTime() + 5 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '); 
+
+                        const updateQuery = `
+                            UPDATE posts 
+                            SET image_access_url = ?, image_url_expires = ?
+                            WHERE post_id = ?
+                        `;
+                        await pool.query(updateQuery, [image_url, expiresAt, post.post_id]);
+                    }
+                }
+
+                return {
+                    ...post,
+                    user_liked,
+                    image_url,
+                };
+            })
+        );
+
+
+        return { success: true, message: "Successfully fetched all posts.", body: parsedResult };
 
     } catch (error) {
         console.log(error)
-        return {success: false, message: "Failed to fetch posts."};
+        return { success: false, message: "Failed to fetch posts." };
     }
 }
 
@@ -65,11 +112,11 @@ export const deletePostInDB = async (userId, postId) => {
         await connection.query(q2, values2);
 
         await connection.commit()
-        return {success: true, message: "Successfully deleted post."};
+        return { success: true, message: "Successfully deleted post." };
     } catch (error) {
         console.log(error)
         await connection.rollback();
-        return {success: false, message: "Failed to delete post."};
+        return { success: false, message: "Failed to delete post." };
     } finally {
         connection.release();
     }

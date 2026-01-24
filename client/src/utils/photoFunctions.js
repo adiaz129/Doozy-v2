@@ -1,7 +1,9 @@
 import * as ImagePicker from 'expo-image-picker';
 import { uploadToFirebase } from '../../firebaseConfig';
+import axios from 'axios';
+import * as ImageManipulator from 'expo-image-manipulator';
 
-export const addImage = async () => {
+export const addImage = async (route) => {
     try {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!permissionResult.granted) {
@@ -15,20 +17,17 @@ export const addImage = async () => {
             quality: 1,
         });
         if (_image.assets && !_image.canceled) {
-            const { uri } = _image.assets[0];
-            const fileName = uri.split('/').pop();
-            const uploadResp = await uploadToFirebase(uri, `images/${fileName}`, (progress) =>
-                console.log(progress)
-            );
-            return uploadResp.downloadUrl;
+            const asset = _image.assets[0];
+            const compressedUri = await compressImage(asset);
+            return await getUploadUnsignedUrl(compressedUri, route);
         }
     } catch (e) {
-        Alert.alert("Error Uploading Image " + e.message);
+        console.error("Error Uploading Image " + e.message);
     }
 };
 
-export const takePhoto = async() => {
-    try{
+export const takePhoto = async (route) => {
+    try {
         const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
 
         if (!permissionResult.granted) {
@@ -43,14 +42,56 @@ export const takePhoto = async() => {
         });
 
         if (_image.assets && !_image.canceled) {
-            const { uri } = _image.assets[0];
-            const fileName = uri.split('/').pop();
-            const uploadResp = await uploadToFirebase(uri, `images/${fileName}`, (progress) =>
-                console.log(progress)
-            );
-            return uploadResp.downloadUrl;
+            const asset = _image.assets[0];
+            const compressedUri = await compressImage(asset);
+            return await getUploadUnsignedUrl(compressedUri, route);
         }
     } catch (e) {
-        Alert.alert("Error Uploading Image " + e.message);
+        console.error("Error Uploading Image " + e.message);
     }
 }
+
+export const getUploadUnsignedUrl = async (localUri, route) => {
+    try {
+        const response = await axios.post(`http://localhost:8800/api/uploads/${route}`);
+        const presignedData = response.data;
+
+        const formData = new FormData();
+
+        Object.entries(presignedData.fields).forEach(([key, value]) => {
+            formData.append(key, value);
+        });
+
+        formData.append("file", {
+            uri: localUri,
+            name: presignedData.key.split('/').pop(),
+            type: 'image/jpeg'
+        });
+
+        const res = await fetch(presignedData.url, {
+            method: 'POST',
+            body: formData,
+        });
+
+        return presignedData.key;
+
+    } catch (error) {
+        console.error("Upload failed:", error);
+        throw error;
+    }
+}
+
+const compressImage = async (asset) => {
+  if (!asset || !asset.uri) throw new Error("Invalid image asset");
+
+  // Default to JPEG
+  const format = ImageManipulator.SaveFormat.JPEG;
+
+  const result = await ImageManipulator.manipulateAsync(
+    asset.uri,
+    [{ resize: { width: 1024 } }], // optional resize
+    { compress: 0.7, format }
+  );
+
+  return result.uri;
+};
