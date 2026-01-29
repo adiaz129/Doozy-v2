@@ -1,4 +1,4 @@
-import { checkFriendStatusInDB, checkFriendStatusByPostInDB } from "../services/friends.js";
+import { checkFriendStatusInDB, checkFriendStatusByPostInDB, checkCurrUserByPostsInDB } from "../services/friends.js";
 
 export const checkFriendStatus = async (req, res, next) => {
     if (req.user.uid === Number(req.params.user_id)) {
@@ -28,6 +28,22 @@ export const checkFriendStatusByPost = async (req, res, next) => {
         else {
             return res.status(403).json({error: "Forbidden"});
         }
+    }
+    else {
+        return res.status(500).json({error: "Database Error"});
+    }
+}
+
+export const checkCurrUserByPosts = async (req, res, next) => {
+    let postIds = req.query.ids;
+    const userId = req.user.uid;
+    postIds = postIds.split(",").filter(Boolean);
+    
+    const response = await checkCurrUserByPostsInDB(postIds, userId);
+    if (response.success) {
+        console.log(response.result)
+        req.postKeys = response.result;
+        return next();
     }
     else {
         return res.status(500).json({error: "Database Error"});

@@ -121,3 +121,28 @@ export const deletePostInDB = async (userId, postId) => {
         connection.release();
     }
 }
+
+export const updatePostStatus = async (key, postId, status) => {
+    try {
+        let image_url = null;
+        let image_url_expires = null;
+
+        if (status === "validated") {
+            const now = new Date();
+                
+            image_url = await getPresignedURL(key);
+            image_url_expires = new Date(now.getTime() + 5 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '); 
+        }
+
+        const updateQuery = `
+            UPDATE posts 
+            SET status = ?, image_access_url = ?, image_url_expires = ?
+            WHERE post_id = ?
+        `;
+        await pool.query(updateQuery, [status, image_url, image_url_expires, postId]);
+
+        return {success: true, message: "Successfully update status.", image_url, image_url_expires };
+    } catch (error) {
+        return {success: false, message: "Failed to update status."};
+    }
+}

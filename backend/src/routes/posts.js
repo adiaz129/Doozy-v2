@@ -2,10 +2,12 @@ import express from 'express';
 import { getAllPosts, deletePost } from '../controllers/posts.js';
 import { toggleLike, getLikes } from '../controllers/likes.js';
 import { getComments, postComment, deleteComment } from '../controllers/comments.js';
-import { checkFriendStatusByPost } from '../middleware/friendStatus.js';
+import { checkFriendStatusByPost, checkCurrUserByPosts } from '../middleware/friendStatus.js';
+import { checkUploadStatus } from '../controllers/posts.js';
 
 const router = express.Router();
 
+router.get('/status', checkCurrUserByPosts, checkUploadStatus);
 router.post('/:post_id/like', checkFriendStatusByPost, toggleLike);
 router.post('/:post_id/comment', checkFriendStatusByPost, postComment)
 router.delete('/:post_id/comment/:comment_id', checkFriendStatusByPost, deleteComment);

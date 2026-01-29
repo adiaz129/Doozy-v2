@@ -1,5 +1,5 @@
 import { getPostsByUserIdInDB, getAllPostsInDB, deletePostInDB } from "../services/posts.js";
-
+import { getUploadValidationsInS3 } from "../services/uploads.js";
 
 export const getPostsByUserId = async (req, res) => {
     try {
@@ -52,5 +52,16 @@ export const deletePost = async (req, res) => {
     } catch (error) {
         console.error('Database error:', error);
         res.status(500).json({ error: 'Database error' })
+    }
+}
+
+export const checkUploadStatus = async (req, res) => {
+    try {
+        const postKeys = req.postKeys;
+        const response = await getUploadValidationsInS3(postKeys);
+        console.log(response)
+        return res.status(200).json(response);
+    } catch (error) {
+        return res.status(500).json({ error: 'Database error' });
     }
 }

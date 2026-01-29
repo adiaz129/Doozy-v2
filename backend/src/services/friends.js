@@ -48,6 +48,19 @@ export const checkFriendStatusByPostInDB = async (postId, userId) => {
     }
 }
 
+export const checkCurrUserByPostsInDB = async (postIds, userId) => {
+    try {
+        const placeholders = postIds.map(() => "?").join(",");
+        const q = `SELECT p.post_id AS post_id, p.image AS image_key FROM posts p
+                WHERE p.post_id IN (${placeholders}) AND p.user_id = ?`;
+        const values = [...postIds, userId];
+        const [result] = await pool.query(q, values);
+        return {success: true, result: result}
+    } catch (error) {
+        return {success: false}
+    }
+}
+
 export const requestFriendInDB = async (requestingId, receivingId) => {
     try {
         const q = `INSERT INTO requests (requesting_id, receiving_id) VALUES (?, ?);`;

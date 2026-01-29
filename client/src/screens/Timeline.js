@@ -1,4 +1,4 @@
-import React, { Component, useEffect, useState } from 'react';
+import React, { Component, useEffect, useState, useContext } from 'react';
 import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback, ImageBackground, RefreshControl, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import fonts from '../theme/fonts';
@@ -12,6 +12,7 @@ import CommentModal from '../components/timeline/CommentModal';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LikeModal from '../components/timeline/LikeModal';
 import axios from 'axios';
+import { AuthContext } from '../AuthContext.js';
 
 const TimelineScreen = (props) => {
   const [refreshing, setRefreshing] = useState(false);
@@ -20,9 +21,54 @@ const TimelineScreen = (props) => {
   const [isCommentModalVisible, setCommentModalVisible] = useState(false);
   const [isLikeModalVisible, setLikeModalVisible] = useState(false);
 
+  const { auth } = useContext(AuthContext);
+
   useEffect(() => {
     refreshPosts();
   }, []);
+
+  useEffect(() => {
+    const currUserId = auth?.uid;
+
+    const pendingPostIds = posts
+      .filter(p => p.status === "pending" && p.user_id === currUserId)
+      .map(p => p.post_id);
+
+    if (pendingPostIds.length === 0) return;
+    const interval = setInterval(async () => {
+      const res = await axios.get(
+        "http://localhost:8800/api/posts/status",
+        { params: { ids: pendingPostIds.join(",") } }
+      );
+
+      const updatedPosts = res.data;
+
+      setPosts(prev =>
+        prev.map(p => {
+          const updated = updatedPosts.find(
+            up => up.post_id === p.post_id
+          );
+
+          return updated
+            ? {
+              ...p,
+              status: updated.status,
+              image_url: updated.image_url,
+              image_url_expiration: updated.image_url_expiration,
+            }
+            : p;
+        })
+      );
+    }, 5000);
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+    }, 60000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [posts]);
 
 
   const refreshPosts = async () => {
@@ -36,9 +82,9 @@ const TimelineScreen = (props) => {
   };
 
   const likeOnly = async (postID, didLike) => {
-      if (!didLike) {
-        await toggleLike(postID, setPosts);
-      }
+    if (!didLike) {
+      await toggleLike(postID, setPosts);
+    }
   }
 
   function doubleTapGesture(postID) {
@@ -73,10 +119,10 @@ const TimelineScreen = (props) => {
         <Image source={{ uri: item.profile_pic }} style={styles.profilePic} />
         <Text style={styles.username}>{item.username}</Text>
       </TouchableOpacity>
-      {item.image && 
-      <GestureDetector gesture={doubleTapGesture(item.post_id)}>
-        <Image source={{ uri: item.image_url }} style={styles.postImage} />
-      </GestureDetector>}
+      {item.image &&
+        <GestureDetector gesture={doubleTapGesture(item.post_id)}>
+          <Image source={{ uri: item.image_url }} style={styles.postImage} />
+        </GestureDetector>}
       <View style={styles.taskInfo}>
         {item.image && <View style={styles.reactionContainer}>
           <View style={styles.reaction}>
@@ -87,10 +133,10 @@ const TimelineScreen = (props) => {
             </TouchableOpacity>
             <TouchableOpacity onPress={() => toggleLikeModal(item.post_id)}>
               <Text style={styles.count}>{item.like_count}</Text>
-            </TouchableOpacity> 
+            </TouchableOpacity>
           </View>
           <View style={styles.reaction}>
-            <TouchableOpacity onPress={() => {toggleCommentModal(item.post_id)}} style={{flexDirection: 'row', alignItems: 'center'}}>
+            <TouchableOpacity onPress={() => { toggleCommentModal(item.post_id) }} style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Ionicons name='chatbubble-outline' size={26} color={colors.primary} />
               <Text style={styles.count}>{item.comment_count}</Text>
             </TouchableOpacity>
@@ -116,7 +162,7 @@ const TimelineScreen = (props) => {
             </TouchableOpacity>
           </View>
           <View style={styles.reaction}>
-            <TouchableOpacity onPress={() => {toggleCommentModal(item.post_id)}} style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start'}}>
+            <TouchableOpacity onPress={() => { toggleCommentModal(item.post_id) }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }}>
               <Ionicons name='chatbubble-outline' size={26} color={colors.primary} />
               <Text style={styles.count}>{item.comment_count}</Text>
             </TouchableOpacity>
@@ -166,6 +212,7 @@ const TimelineScreen = (props) => {
           <Text style={styles.title}>Doozy</Text>
         </View>
       </View>
+      {/* make it so that posts.pending and posts.rejected dont show up */}
       <FlatList
         data={posts}
         extraData={posts}
@@ -175,7 +222,7 @@ const TimelineScreen = (props) => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
-        style={{marginBottom: 40}}
+        style={{ marginBottom: 40 }}
       />
     </SafeAreaView>
   );
