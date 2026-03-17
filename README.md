@@ -46,8 +46,7 @@ Storage: AWS S3
 - **Android:** Open the Expo Go app and scan the QR code displayed in the terminal or browser.
 
 ## Additional Tips
-
-- Feel free to use the demo account to log in rather than signing up
-  - email: demo_account@gmail.com
-  - password: password
+- The MySQL database is local (localhost), so other developers will start from scratch with their own local database.
+- .env.example should be used as a template; no secrets are shared publicly.
+- AWS credentials must remain private and should be added only in your local .env file.
 - There are some minor bugs on Android that don't allow task edit or task sorting
