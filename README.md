@@ -8,9 +8,13 @@ A social media to-do app that combines task management with social interaction, 
 ## Tech Stack
 
 Frontend: React Native (Expo)
+
 Backend: Node.js, Express
+
 Database: MySQL
+
 Authentication: JWT
+
 Storage: AWS S3
 
 ## Installation and Running
