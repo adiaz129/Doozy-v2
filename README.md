@@ -13,7 +13,7 @@ Database: MySQL
 Authentication: JWT
 Storage: AWS S3
 
-### Installation and Running
+## Installation and Running
 
 1. **Clone the repository**
 
@@ -41,7 +41,7 @@ Storage: AWS S3
 - **iOS:** Open the Camera app and scan the QR code displayed in the terminal or browser. This will prompt you to open the project in Expo Go.
 - **Android:** Open the Expo Go app and scan the QR code displayed in the terminal or browser.
 
-### Additional Tips
+## Additional Tips
 
 - Feel free to use the demo account to log in rather than signing up
   - email: demo_account@gmail.com
