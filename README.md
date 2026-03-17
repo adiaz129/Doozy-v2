@@ -5,28 +5,35 @@ A social media to-do app that combines task management with social interaction, 
 ## Watch the demo
 [![Watch the demo](https://img.youtube.com/vi/y3X5wKtbIBE/0.jpg)](https://www.youtube.com/watch?v=y3X5wKtbIBE)
 
-## Getting Started
+## Tech Stack
 
-### Prerequisites
-
-- Node.js installed  
-- npm or yarn package manager  
-- Expo Go app installed on your mobile device (iOS or Android)
+Frontend: React Native (Expo)
+Backend: Node.js, Express
+Database: MySQL
+Authentication: JWT
+Storage: AWS S3
 
 ### Installation and Running
 
 1. **Clone the repository**
 
-- git clone https://github.com/aimee4312/Doozy.git
-- cd Doozy
+- git clone https://github.com/adiaz129/Doozy-v2.git
 
-2. **Install dependencies**
+2. **Backend Setup**
 
-- Run the following command in your project directory:
+- cd backend
+- Install Dependencies:
 - npm install / yarn install (depending on your package manager)
+- Configure environment variables:
+- cp .env.example .env
+- Update .env with your credentials.
+- npm start
 
-3. **Start the Expo development server**
+3. **Frontend Setup**
 
+- cd ../client
+- Install Dependencies:
+- npm install / yarn install (depending on your package manager)
 - npx expo start --go
 
 4. **Open the app on your device**
