@@ -434,7 +434,7 @@ const TaskCreation = (props) => {
             <View style={styles.bottomBar}>
                 <View style={styles.buttonContainer}>
                     <TouchableOpacity onPress={openTaskCreationModal} style={styles.addTaskButton}>
-                        <AntDesign name="pluscircle" size={64} color={colors.accent} />
+                        <AntDesign name="plus-circle" size={64} color={colors.accent} />
                     </TouchableOpacity>
                 </View>
             </View>
