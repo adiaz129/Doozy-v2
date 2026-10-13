@@ -4,6 +4,13 @@ require File.join(File.dirname(`node --print "require.resolve('react-native/pack
 require 'json'
 podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties.json'))) rescue {}
 
+# react-native-firebase >=23 resolves the Firebase iOS SDK via SPM by
+# default, whose automatic-library products collide at link time under
+# our static use_frameworks! linkage (needed for the CocoaPods-based
+# Firebase modularHeaders config in app.json's expo-build-properties).
+# Keep resolving Firebase through CocoaPods instead.
+$RNFirebaseDisableSPM = true
+
 ENV['RCT_NEW_ARCH_ENABLED'] = '0' if podfile_properties['newArchEnabled'] == 'false'
 ENV['EX_DEV_CLIENT_NETWORK_INSPECTOR'] = podfile_properties['EX_DEV_CLIENT_NETWORK_INSPECTOR']
 
@@ -63,15 +70,23 @@ target 'doozy' do
 
     # Several pods (RNImagePickerPrivacyInfo, AsyncStorage, SVG, Firebase,
     # GoogleUtilities, SDWebImage) still declare pre-iOS-15 deployment targets.
-    # Xcode's supported floor has risen to 15.0, which turns this from a
-    # cosmetic warning into a hard build error. Clamp every pod target up to
-    # the project's own floor.
+    # Xcode's supported floor keeps rising (15.0 under Xcode 27, 16.4 as of
+    # SDK 56/Xcode 27.4+), which turns this from a cosmetic warning into a
+    # hard build error. Clamp every pod target up to the project's own floor.
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         deployment_target = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
-        if deployment_target && deployment_target.to_f < 15.0
-          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+        if deployment_target && deployment_target.to_f < 16.4
+          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.4'
         end
+
+        # react-native-firebase's RNFBApp pod plain-#imports React-Core
+        # headers (RCTConvert.h, RCTBridgeModule.h, RCTEventEmitter.h) from
+        # inside its own framework module. RN 0.85's prebuilt React-Core
+        # framework enforces strict Clang module boundaries, which turns
+        # that into a hard -Werror,-Wnon-modular-include-in-framework-module
+        # build failure under use_frameworks!. Relax it for pod targets.
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       end
     end
   end
